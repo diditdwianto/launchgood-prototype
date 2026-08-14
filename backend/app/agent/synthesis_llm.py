@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 import time
 
@@ -78,6 +79,45 @@ def model_name() -> str:
 
 # Models whose quota ran out this process. Not retried again; the chain moves on.
 _exhausted: set[str] = set()
+
+# Live rate-limit state per model, scraped from response headers.
+#
+# Groq exposes remaining per-MINUTE capacity on every response (x-ratelimit-*), but
+# publishes no endpoint and no header for the per-DAY token quota — that number
+# appears only inside the text of the 429 that announces you have hit it. So the
+# minute window can be watched proactively, and the daily one can only be recorded
+# after the fact. Both are captured here; neither is inferred.
+_limits: dict[str, dict] = {}
+
+_DAILY_QUOTA_RE = re.compile(
+    r"on tokens per day \(TPD\): Limit (\d+), Used (\d+)", re.IGNORECASE
+)
+
+
+def _record_headers(model: str, headers) -> None:
+    entry = _limits.setdefault(model, {})
+    for key, field in (
+        ("x-ratelimit-remaining-tokens", "tokens_remaining_this_minute"),
+        ("x-ratelimit-limit-tokens", "tokens_per_minute"),
+        ("x-ratelimit-remaining-requests", "requests_remaining"),
+        ("x-ratelimit-reset-tokens", "tokens_reset_in"),
+    ):
+        value = headers.get(key)
+        if value is not None:
+            entry[field] = value
+
+
+def _record_daily_quota(model: str, exc: Exception) -> None:
+    match = _DAILY_QUOTA_RE.search(str(exc))
+    if match:
+        limit, used = int(match.group(1)), int(match.group(2))
+        _limits.setdefault(model, {}).update(
+            {"tokens_per_day": limit, "tokens_used_today": used}
+        )
+
+
+def rate_limits() -> dict[str, dict]:
+    return {m: dict(v) for m, v in _limits.items()}
 
 
 MAX_TRANSIENT_RETRIES = 4
@@ -224,7 +264,7 @@ def _call_one(model: str, messages: list[dict]) -> str:
     for attempt in range(MAX_TRANSIENT_RETRIES + 1):
         started = time.perf_counter()
         try:
-            resp = _get_client().chat.completions.create(
+            raw = _get_client().chat.completions.with_raw_response.create(
                 model=model,
                 messages=messages,
                 response_format={
@@ -233,8 +273,14 @@ def _call_one(model: str, messages: list[dict]) -> str:
                 },
                 temperature=0.2,
             )
+            _record_headers(model, raw.headers)
+            resp = raw.parse()
         except Exception as exc:  # noqa: BLE001 - classified below
+            response = getattr(exc, "response", None)
+            if response is not None:
+                _record_headers(model, response.headers)
             if _is_quota_exhausted(exc):
+                _record_daily_quota(model, exc)
                 raise
             delay = _retry_delay(exc, attempt)
             if delay is None or attempt == MAX_TRANSIENT_RETRIES:

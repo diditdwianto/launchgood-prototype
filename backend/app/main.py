@@ -99,6 +99,10 @@ def health() -> dict:
         # so nobody reads output from a model they did not choose.
         "exhausted_models": sorted(synthesis_llm._exhausted),
         "usage": synthesis_llm.usage.summary(),
+        # Scraped from response headers. Per-minute figures are live; the per-day
+        # quota appears only in the text of the 429 that announces it, so it shows
+        # up here after a model has been exhausted, not before.
+        "rate_limits": synthesis_llm.rate_limits(),
     }
 
 

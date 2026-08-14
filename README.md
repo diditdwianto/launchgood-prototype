@@ -199,6 +199,21 @@ do not work, and each failure is different:
 A fallback that cannot satisfy the contract is an outage with extra steps, so
 misconfiguration fails loudly at startup rather than silently under load.
 
+**Quota observability.** `/api/health` reports live rate-limit state per model, scraped
+from response headers. Groq publishes remaining per-*minute* capacity on every response
+but exposes no endpoint and no header for the per-*day* token quota — that number appears
+only inside the text of the 429 announcing you have hit it. Both are captured, and the
+distinction is kept honest: the minute window can be watched ahead of time, the daily one
+can only be recorded after the fact.
+
+```json
+"openai/gpt-oss-20b": {
+  "tokens_remaining_this_minute": "8000",
+  "tokens_per_day": 200000,
+  "tokens_used_today": 199219
+}
+```
+
 ## Layout
 
 ```
