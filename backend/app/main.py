@@ -86,11 +86,19 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health() -> dict:
+    from .agent import synthesis_llm
+
     return {
         "ok": True,
         "synthesizer": _synthesizer().__name__,
         "search_provider": tools.get_search_provider().name,
         "assessed": len(db.all_assessments()),
+        "model_chain": synthesis_llm.model_chain(),
+        "active_model": synthesis_llm.model_name(),
+        # Non-empty means a model ran out of quota and the chain moved on. Surfaced
+        # so nobody reads output from a model they did not choose.
+        "exhausted_models": sorted(synthesis_llm._exhausted),
+        "usage": synthesis_llm.usage.summary(),
     }
 
 

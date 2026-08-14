@@ -134,6 +134,10 @@ def render_evidence_bundle(
     L: list[str] = []
 
     L.append(f"CAMPAIGN {campaign['campaign_id']}")
+    # Stated explicitly because the model otherwise has to guess the current year to
+    # check any relative claim. gpt-oss-20b called "run for six years" inconsistent
+    # with a source saying "since 2020" on a 2026 submission — the two agree.
+    L.append(f"Submitted: {campaign['submitted_at'][:10]} (use this as today's date)")
     L.append(f"Title: {campaign['title']}")
     L.append(f"Organizer: {campaign['organizer_name']} ({campaign['organizer_type']})")
     L.append(f"Organizer account age: {campaign['organizer_account_age_days']} days")

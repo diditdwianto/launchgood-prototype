@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -12,9 +13,36 @@ from pydantic import ValidationError
 from .prompts import SYNTHESIS_SYSTEM
 from .schemas import Flag, SynthesisDraft
 
-# Groq list pricing for openai/gpt-oss-120b, USD per million tokens.
-PRICE_IN = 0.15
-PRICE_OUT = 0.75
+logger = logging.getLogger(__name__)
+
+DEFAULT_MODEL = "openai/gpt-oss-20b"
+
+# Groq list pricing, USD per million tokens (input, output).
+PRICING: dict[str, tuple[float, float]] = {
+    "openai/gpt-oss-20b": (0.075, 0.30),
+    "openai/gpt-oss-120b": (0.15, 0.60),
+    "llama-3.3-70b-versatile": (0.59, 0.79),
+}
+
+
+# Daily token quotas are per-model, so a model that is exhausted is not a model that
+# is slow — no amount of backoff recovers it. `groq_model` accepts a comma-separated
+# chain; when one model's quota is gone the next one takes over mid-run rather than
+# the whole batch failing. Order it cheapest-capable first.
+def model_chain() -> list[str]:
+    raw = os.environ.get("groq_model", DEFAULT_MODEL)
+    return [m.strip() for m in raw.split(",") if m.strip()] or [DEFAULT_MODEL]
+
+
+def model_name() -> str:
+    """The model currently in use — the first in the chain that has not been exhausted."""
+    chain = model_chain()
+    return next((m for m in chain if m not in _exhausted), chain[-1])
+
+
+# Models whose quota ran out this process. Not retried again; the chain moves on.
+_exhausted: set[str] = set()
+
 
 MAX_TRANSIENT_RETRIES = 4
 SCHEMA_REPAIR_ATTEMPTS = 1  # Capped deliberately. An unbounded repair loop against a
@@ -22,31 +50,44 @@ SCHEMA_REPAIR_ATTEMPTS = 1  # Capped deliberately. An unbounded repair loop agai
 
 
 class Usage:
-    """Process-wide token accounting. Cost is named in the role's grading criteria."""
+    """Token accounting, tracked per model.
+
+    Per-model rather than aggregate because the chain can shift mid-run: pricing
+    differs by an order of magnitude across it, so one blended figure would be wrong
+    for every model in it.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.calls = 0
-        self.prompt_tokens = 0
-        self.completion_tokens = 0
         self.seconds = 0.0
+        self.by_model: dict[str, dict[str, int]] = {}
 
-    def add(self, prompt: int, completion: int, seconds: float) -> None:
+    def add(self, model: str, prompt: int, completion: int, seconds: float) -> None:
         with self._lock:
             self.calls += 1
-            self.prompt_tokens += prompt
-            self.completion_tokens += completion
             self.seconds += seconds
+            entry = self.by_model.setdefault(model, {"calls": 0, "prompt": 0, "completion": 0})
+            entry["calls"] += 1
+            entry["prompt"] += prompt
+            entry["completion"] += completion
 
     @property
     def usd(self) -> float:
-        return (self.prompt_tokens * PRICE_IN + self.completion_tokens * PRICE_OUT) / 1_000_000
+        total = 0.0
+        for model, e in self.by_model.items():
+            # Unknown model: contribute 0 rather than inventing a rate. A cost figure
+            # you cannot source is worse than no cost figure.
+            price_in, price_out = PRICING.get(model, (0.0, 0.0))
+            total += (e["prompt"] * price_in + e["completion"] * price_out) / 1_000_000
+        return total
 
     def summary(self) -> dict:
         return {
+            "models_used": {m: e["calls"] for m, e in self.by_model.items()},
             "calls": self.calls,
-            "prompt_tokens": self.prompt_tokens,
-            "completion_tokens": self.completion_tokens,
+            "prompt_tokens": sum(e["prompt"] for e in self.by_model.values()),
+            "completion_tokens": sum(e["completion"] for e in self.by_model.values()),
             "total_usd": round(self.usd, 5),
             "usd_per_call": round(self.usd / self.calls, 5) if self.calls else 0.0,
             "avg_seconds": round(self.seconds / self.calls, 2) if self.calls else 0.0,
@@ -65,18 +106,55 @@ def _get_client() -> Groq:
     return _client
 
 
-def _model() -> str:
-    return os.environ.get("groq_model", "openai/gpt-oss-120b")
+# Groq's own error codes for "the model failed to satisfy the strict schema on this
+# sample". Matched on code rather than on the human-readable message, which is not
+# stable: gpt-oss-120b says "Generated JSON does not match the expected schema" and
+# gpt-oss-20b says "Failed to validate JSON", so a prose match silently stopped
+# retrying the moment the model was swapped.
+SCHEMA_FAILURE_CODES = {"json_validate_failed", "json_schema_validation_failed"}
+
+
+def _error_code(exc: Exception) -> str | None:
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict):
+        error = body.get("error")
+        if isinstance(error, dict):
+            return error.get("code")
+    return None
+
+
+def _is_quota_exhausted(exc: Exception) -> bool:
+    """A daily quota is not a pacing problem.
+
+    Groq returns 429 for both "you are going too fast" and "you are out of tokens for
+    today", and only the message separates them. Backing off on the second wastes the
+    whole retry budget on a call that cannot succeed until tomorrow, which is exactly
+    what makes it worth falling back to another model instead.
+    """
+    if getattr(exc, "status_code", None) != 429:
+        return False
+
+    message = str(exc).lower()
+    if "per day" in message or "tpd" in message or "rpd" in message:
+        return True
+
+    # A retry-after measured in minutes is a quota in all but name.
+    response = getattr(exc, "response", None)
+    header = response.headers.get("retry-after") if response is not None else None
+    try:
+        return float(header) > 120 if header else False
+    except (TypeError, ValueError):
+        return False
 
 
 def _retry_delay(exc: Exception, attempt: int) -> float | None:
     """None means do not retry.
 
-    Two upstream failures are worth distinguishing. A 429 is a pacing problem and
-    the server tells us how long to wait. A 400 saying the generated JSON did not
-    match the schema is the model failing to satisfy strict mode on this sample —
-    a fresh sample usually succeeds, so it is retryable, while any other 400 is a
-    bug in our request and retrying it just burns quota.
+    Three upstream failures are worth distinguishing. A 429 is a pacing problem and
+    the server tells us how long to wait. A 400 whose code says the model could not
+    satisfy strict mode is sample-dependent — a fresh sample usually succeeds — so it
+    is retryable. Any other 400 is a bug in our request, and retrying it just burns
+    quota against a call that will never succeed.
     """
     status = getattr(exc, "status_code", None)
 
@@ -88,8 +166,11 @@ def _retry_delay(exc: Exception, attempt: int) -> float | None:
         except (TypeError, ValueError):
             return 2.0 * 2**attempt
 
-    if status == 400 and "does not match the expected schema" in str(exc):
-        return 0.5 * 2**attempt
+    if status == 400:
+        code = _error_code(exc)
+        if code in SCHEMA_FAILURE_CODES or "validate json" in str(exc).lower():
+            return 0.5 * 2**attempt
+        return None
 
     if status is None or status >= 500:
         return 0.5 * 2**attempt
@@ -97,14 +178,18 @@ def _retry_delay(exc: Exception, attempt: int) -> float | None:
     return None
 
 
-def _call(messages: list[dict]) -> str:
+def _call_one(model: str, messages: list[dict]) -> str:
+    """Try a single model, with retries for genuinely transient failures.
+
+    Raises on quota exhaustion immediately rather than burning the retry budget.
+    """
     schema = SynthesisDraft.model_json_schema()
 
     for attempt in range(MAX_TRANSIENT_RETRIES + 1):
         started = time.perf_counter()
         try:
             resp = _get_client().chat.completions.create(
-                model=_model(),
+                model=model,
                 messages=messages,
                 response_format={
                     "type": "json_schema",
@@ -112,7 +197,9 @@ def _call(messages: list[dict]) -> str:
                 },
                 temperature=0.2,
             )
-        except Exception as exc:  # noqa: BLE001 - classified by _retry_delay
+        except Exception as exc:  # noqa: BLE001 - classified below
+            if _is_quota_exhausted(exc):
+                raise
             delay = _retry_delay(exc, attempt)
             if delay is None or attempt == MAX_TRANSIENT_RETRIES:
                 raise
@@ -120,6 +207,7 @@ def _call(messages: list[dict]) -> str:
             continue
 
         usage.add(
+            model,
             resp.usage.prompt_tokens,
             resp.usage.completion_tokens,
             time.perf_counter() - started,
@@ -127,6 +215,34 @@ def _call(messages: list[dict]) -> str:
         return resp.choices[0].message.content
 
     raise RuntimeError("unreachable")
+
+
+def _call(messages: list[dict]) -> str:
+    """Walk the model chain, moving on when a model's quota is gone.
+
+    Falling back is a real change in behaviour, not a transparent retry: a smaller
+    model produces different flags. It is logged and surfaced in /api/health so a
+    reviewer is never quietly reading output from a model they did not choose.
+    """
+    chain = model_chain()
+    last: Exception | None = None
+
+    for model in chain:
+        if model in _exhausted:
+            continue
+        try:
+            return _call_one(model, messages)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if _is_quota_exhausted(exc) and model != chain[-1]:
+                _exhausted.add(model)
+                logger.warning(
+                    "quota exhausted for %s, falling back to next model in chain", model
+                )
+                continue
+            raise
+
+    raise last if last else RuntimeError("no models available in chain")
 
 
 def llm_synthesize(bundle: str, preexisting: str, pre_flags: list[Flag]) -> SynthesisDraft:

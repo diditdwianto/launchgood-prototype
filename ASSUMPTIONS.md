@@ -25,10 +25,13 @@ parts of the design would change.
 
 ## Deviations from the original brief
 
-- **The brief specifies Anthropic Claude; this uses Groq with `openai/gpt-oss-120b`.**
+- **The brief specifies Anthropic Claude; this uses Groq with `openai/gpt-oss-20b`.**
   The provider was swapped for credential availability. It was verified before any
-  pipeline code was written that this model honours `response_format: json_schema` with
-  `strict: true`, which is what the structured-output requirement depends on.
+  pipeline code was written that this model family honours `response_format: json_schema`
+  with `strict: true`, which is what the structured-output requirement depends on.
+  The pipeline was originally built and tuned against `gpt-oss-120b` and moved down to the
+  20b after exhausting the larger model's token quota — the model is a single environment
+  variable (`groq_model`), and pricing for both is in `synthesis_llm.py`.
 - **LangGraph is used without `langchain-groq`.** Nodes are plain Python functions calling
   the `groq` SDK directly. One less abstraction over the exact `response_format` behaviour
   that needed observing.

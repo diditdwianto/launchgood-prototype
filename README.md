@@ -153,8 +153,22 @@ The queue is populated at startup from a committed seed, so there is no empty st
 no dependency on fourteen cold API calls. **"Re-run assessment"** on any campaign runs the
 full pipeline live against the model. To rebuild the seed: `uv run python -m app.build_seed`.
 
-Cost is about **$0.0007 per campaign** (~1.5k prompt + ~600 completion tokens),
-roughly 3 seconds each.
+Cost is about **$0.0003 per campaign** on `gpt-oss-20b` (~1.9k prompt + ~600 completion
+tokens), roughly 2 seconds each.
+
+**Model fallback.** `groq_model` takes a comma-separated chain, cheapest-capable first:
+
+```
+groq_model=openai/gpt-oss-20b,openai/gpt-oss-120b
+```
+
+Groq returns 429 both for "you are going too fast" and for "you are out of tokens for
+today", and only the message separates them. Backing off on the second wastes the entire
+retry budget on a call that cannot succeed until tomorrow — so a daily quota is detected
+and the chain advances to the next model instead, mid-run, rather than failing the batch.
+Falling back is a real change in behaviour and not a transparent retry, so `/api/health`
+reports the active model and any that were exhausted. Nobody should be reading output from
+a model they did not choose without knowing it.
 
 ## Layout
 

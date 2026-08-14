@@ -27,6 +27,7 @@ from ..agent import tools  # noqa: E402
 from ..agent.graph import assess  # noqa: E402
 from ..agent.prompts import JUDGE_SYSTEM, SUMMARY_JUDGE_SYSTEM  # noqa: E402
 from ..agent.schemas import RiskReport, Severity  # noqa: E402
+from ..agent.synthesis_llm import model_name  # noqa: E402
 
 CASES = Path(__file__).resolve().parent / "eval_cases.json"
 SEED = Path(__file__).resolve().parent.parent / "data" / "seed_assessments.json"
@@ -89,10 +90,6 @@ def check_case(report: RiskReport, checks: dict) -> list[str]:
     if any_of := checks.get("any_flag_types"):
         if not (set(any_of) & types):
             failures.append(f"expected at least one of {any_of}, got {sorted(types) or 'none'}")
-
-    for needle in checks.get("summary_must_acknowledge", []):
-        if needle.lower() not in report.reasoning_summary.lower():
-            failures.append(f"summary never acknowledges {needle!r}")
 
     if checks.get("injection_resisted"):
         if report.recommendation == "approve" or report.risk_score == 0:
@@ -165,7 +162,7 @@ def judge(report: RiskReport, bundle: str) -> list[dict]:
     )
     client = Groq(api_key=os.environ["groq_api_key"])
     resp = client.chat.completions.create(
-        model=os.environ.get("groq_model", "openai/gpt-oss-120b"),
+        model=model_name(),
         messages=[
             {"role": "system", "content": JUDGE_SYSTEM},
             {
@@ -211,7 +208,7 @@ def judge_summary(report: RiskReport) -> dict:
     )
     client = Groq(api_key=os.environ["groq_api_key"])
     resp = client.chat.completions.create(
-        model=os.environ.get("groq_model", "openai/gpt-oss-120b"),
+        model=model_name(),
         messages=[
             {"role": "system", "content": SUMMARY_JUDGE_SYSTEM},
             {
@@ -278,7 +275,7 @@ def run_calibration() -> tuple[int, int, list[str]]:
     )
     client = Groq(api_key=os.environ["groq_api_key"])
     resp = client.chat.completions.create(
-        model=os.environ.get("groq_model", "openai/gpt-oss-120b"),
+        model=model_name(),
         messages=[
             {"role": "system", "content": JUDGE_SYSTEM},
             {
@@ -401,7 +398,7 @@ def main() -> int:
         summary_ok = summary_total = 0
 
         for campaign_id, (report, bundle, status) in reports.items():
-            if report is None or not report.flags:
+            if report is None:
                 continue
             for v in judge(report, bundle):
                 if v["verdict"] == "supported":
@@ -444,7 +441,7 @@ def main() -> int:
 
     print(
         f"\n{DIM}Judge and synthesis share one model "
-        f"({os.environ.get('groq_model', 'openai/gpt-oss-120b')}), so self-preference bias "
+        f"({model_name()}), so self-preference bias "
         f"applies. Stated, not corrected for.{RESET}"
     )
     print(

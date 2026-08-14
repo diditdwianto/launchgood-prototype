@@ -256,7 +256,20 @@ def make_risk_synthesis(synthesize: Synthesizer):
         flags = _merge_flags(pre_flags, draft.flags, state)
         risk_score = scoring.score(flags)
         risk_tier = scoring.tier(risk_score)
-        recommendation, clamp_note = scoring.clamp(draft.recommendation, risk_tier, flags)
+
+        # Corroboration means something outside the submission itself vouches for the
+        # organizer: a registry record, or any search result. An individual with a new
+        # account and no web presence has neither, which is not adverse but is also not
+        # a basis on which a human should be told "safe to approve".
+        org = state.get("org")
+        corroborated = bool(
+            (org is not None and org.status in ("verified", "lapsed", "revoked"))
+            or state.get("search_results")
+        )
+
+        recommendation, clamp_note = scoring.clamp(
+            draft.recommendation, risk_tier, flags, corroborated
+        )
 
         report = RiskReport(
             campaign_id=campaign["campaign_id"],
