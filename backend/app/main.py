@@ -9,11 +9,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from . import db
+from . import auth, db
 from .agent import scoring, tools
 from .agent.graph import assess
 from .agent.schemas import Decision
@@ -83,6 +84,54 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Everything under /api is authenticated unless listed here. An allowlist rather than
+# per-route dependencies so that adding an endpoint cannot accidentally add an
+# unprotected one — the failure mode of forgetting is a locked door, not an open one.
+PUBLIC_PATHS = {"/api/health", "/api/auth/login"}
+
+
+@app.middleware("http")
+async def require_auth(request: Request, call_next):
+    path = request.url.path
+    if (
+        not path.startswith("/api")
+        or path in PUBLIC_PATHS
+        or request.method == "OPTIONS"  # CORS preflight carries no Authorization header
+    ):
+        return await call_next(request)
+
+    header = request.headers.get("authorization", "")
+    token = header[7:].strip() if header.lower().startswith("bearer ") else ""
+    # SSE cannot set headers through EventSource, so a token query param is accepted
+    # for streaming endpoints only.
+    if not token and path.endswith("/stream"):
+        token = request.query_params.get("token", "")
+
+    if auth.read_token(token) is None:
+        return JSONResponse({"detail": "not authenticated"}, status_code=401)
+    return await call_next(request)
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/login")
+def login(body: LoginRequest) -> dict:
+    user = auth.authenticate(body.username, body.password)
+    if user is None:
+        # One message for both "no such user" and "wrong password": distinguishing
+        # them tells an attacker which usernames are real.
+        raise HTTPException(status_code=401, detail="incorrect username or password")
+    return {"token": auth.issue_token(user["username"]), "user": user}
+
+
+@app.get("/api/auth/me")
+def me(username: str = Depends(auth.current_user)) -> dict:
+    return {"username": username}
 
 
 @app.get("/api/health")
