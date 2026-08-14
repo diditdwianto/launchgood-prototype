@@ -1,0 +1,141 @@
+{
+  "_comment": "Canned search results keyed by organizer name, served by MockSearchProvider. A real TavilySearchProvider implementing the same interface lives in tools.py but is not wired in. Absence of a key means zero results, which is a signal to be interpreted in context, not a failure.",
+
+  "Alamgir Relief Trust": [],
+
+  "Kaduna Community Development Initiative": [
+    {
+      "title": "Kaduna Community Development Initiative | CAC registered non-profit",
+      "url": "https://example-ngodirectory.org/ng/kaduna-cdi",
+      "snippet": "Registered 2014 (CAC/IT/118842). Water, sanitation and school infrastructure projects across Kaduna State. Annual returns filed through 2025."
+    },
+    {
+      "title": "Rigachikun ward gets new borehole after community drive",
+      "url": "https://example-kadunaherald.ng/rigachikun-borehole",
+      "snippet": "The Kaduna Community Development Initiative handed over two rehabilitated boreholes to the ward water committee in February."
+    }
+  ],
+
+  "East London Masjid Trust": [
+    {
+      "title": "East London Mosque and London Muslim Centre",
+      "url": "https://example-charitycommission.gov.uk/charity/1076197",
+      "snippet": "Charity number 1076197. Income £8.4m (2025). Accounts filed on time. Trustees listed."
+    },
+    {
+      "title": "Tower Hamlets food bank partners with East London Masjid",
+      "url": "https://example-eastlondonnews.co.uk/foodbank-partnership",
+      "snippet": "The masjid's food parcel programme, running since 2020, distributed 14,000 parcels last year in partnership with the council's family support team."
+    }
+  ],
+
+  "Siti Nurhaliza Rahman": [],
+
+  "Amanah Qurban Services": [
+    {
+      "title": "Amanah Qurban Services — Kemensos registered (ID-KEMSOS-5528)",
+      "url": "https://example-kemensos.go.id/lembaga/5528",
+      "snippet": "Registered social organisation, East Java. Qurbani and food distribution programmes since 2017."
+    },
+    {
+      "title": "Qurbani distribution reaches 400 families in East Java",
+      "url": "https://example-jatimpost.id/qurban-2025",
+      "snippet": "Amanah Qurban Services reported completing its 2025 programme across eleven villages, with distribution documented for donors."
+    }
+  ],
+
+  "Bradford Community Volunteers": [
+    {
+      "title": "Bradford Community Volunteers — Facebook group",
+      "url": "https://example-social.com/groups/bradfordcommunityvols",
+      "snippet": "Local volunteer group, 340 members. Posts show food distribution photos from winter 2025. No registration number listed. Page created 2024."
+    },
+    {
+      "title": "Bradford Community Volunteers Ltd — dissolved company",
+      "url": "https://example-companieshouse.gov.uk/company/09912847",
+      "snippet": "Private company limited by guarantee, incorporated 2016, DISSOLVED 2019. Registered office Leeds. No connection to charitable activity on record."
+    }
+  ],
+
+  "Ummah Welfare Aid": [
+    {
+      "title": "Ummah Welfare Aid — charity 1000091",
+      "url": "https://example-charitycommission.gov.uk/charity/1000091",
+      "snippet": "Registered charity. Partner and delivery-partner arrangements are listed in the annual report; the published partner list for 2026 does not include any Bradford-based volunteer group."
+    }
+  ],
+
+  "Hidaya Orphan Care": [
+    {
+      "title": "Hidaya Orphan Care — PCP certified",
+      "url": "https://example-pcp.org.pk/certified/2187",
+      "snippet": "Pakistan Centre for Philanthropy certified organisation, Peshawar. Orphan sponsorship and education programmes. Certification current."
+    }
+  ],
+
+  "Masjid Bilal ibn Rabah Community Fund": [
+    {
+      "title": "Une nouvelle salle de prière à Toulouse Mirail",
+      "url": "https://example-toulouseinfo.fr/salle-priere-mirail",
+      "snippet": "Un collectif de fidèles loue depuis 2025 un local dans le quartier du Mirail. Le collectif n'est pas constitué en association déclarée."
+    }
+  ],
+
+  "Bosnia Yetim Trust": [
+    {
+      "title": "Bosnia Yetim Trust — registered association",
+      "url": "https://example-mpr.gov.ba/udruzenja/7731",
+      "snippet": "Registered with the Ministry of Justice since 2012. Operates a children's home in Srebrenica."
+    },
+    {
+      "title": "Srebrenica children's home wing declared unsafe",
+      "url": "https://example-klix.ba/srebrenica-dom",
+      "snippet": "A structural survey in May found the 1974 dormitory wing unfit for occupancy. Twenty-eight children were relocated to temporary accommodation."
+    }
+  ],
+
+  "Gaza Medical Aid Fund": [
+    {
+      "title": "Gaza Medical Aid Fund — Jordan MSD registered",
+      "url": "https://example-msd.gov.jo/orgs/2041",
+      "snippet": "Registered 2013. Medical supply procurement and clinic support. Filings current."
+    }
+  ],
+
+  "Global Sadaqah Direct": [
+    {
+      "title": "Warning: unsolicited zakat appeal messages",
+      "url": "https://example-consumerforum.org/threads/zakat-wire-transfer-requests",
+      "snippet": "Several users report receiving messages from a 'Global Sadaqah Direct' asking for wire transfers. No registration or address could be found for this name in any jurisdiction."
+    }
+  ],
+
+  "Sisters United Education Trust": [
+    {
+      "title": "NGO Board revokes registration of Mombasa education trust",
+      "url": "https://example-nationkenya.co.ke/ngo-board-revocation",
+      "snippet": "The NGO Coordination Board revoked the registration of Sisters United Education Trust in June 2022 following a governance audit that found unaccounted disbursements."
+    }
+  ],
+
+  "Sahara Water Project": [
+    {
+      "title": "Sahara Water Project — ONG registered in Mali",
+      "url": "https://example-mali-ong.ml/registre/0442",
+      "snippet": "Registered 2016. Borehole drilling and village water committee training in the Timbuktu region."
+    }
+  ],
+
+  "Noor Relief Network": [
+    {
+      "title": "Noor Relief Network — charity 1142880",
+      "url": "https://example-charitycommission.gov.uk/charity/1142880",
+      "snippet": "Registered 2011. Status: removed from the register 31 December 2023 for failure to file annual returns. Charity states it is working to restore registration."
+    },
+    {
+      "title": "Manchester winter fuel grants helped 210 households",
+      "url": "https://example-mcrevening.co.uk/winter-fuel-grants",
+      "snippet": "Noor Relief Network distributed small fuel grants referred through GP surgeries across two winters, publishing recipient counts each year."
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+[
+  {
+    "name": "Kaduna Community Development Initiative",
+    "registry": "Nigeria Corporate Affairs Commission",
+    "registration_id": "CAC/IT/118842",
+    "status": "verified",
+    "country": "Nigeria",
+    "registered_since": "2014-03-11"
+  },
+  {
+    "name": "East London Masjid Trust",
+    "registry": "UK Charity Commission",
+    "registration_id": "1076197",
+    "status": "verified",
+    "country": "United Kingdom",
+    "registered_since": "1999-08-02"
+  },
+  {
+    "name": "Ummah Welfare Aid",
+    "registry": "UK Charity Commission",
+    "registration_id": "1000091",
+    "status": "verified",
+    "country": "United Kingdom",
+    "registered_since": "2003-01-20"
+  },
+  {
+    "name": "Al-Birr Foundation Malaysia",
+    "registry": "Malaysia Registry of Societies",
+    "registration_id": "PPM-009-14-2201",
+    "status": "verified",
+    "country": "Malaysia",
+    "registered_since": "2011-06-30"
+  },
+  {
+    "name": "Hidaya Orphan Care",
+    "registry": "Pakistan Centre for Philanthropy",
+    "registration_id": "PCP-R-2187",
+    "status": "verified",
+    "country": "Pakistan",
+    "registered_since": "2009-11-05"
+  },
+  {
+    "name": "Sahara Water Project",
+    "registry": "Mali Ministere de l'Administration Territoriale",
+    "registration_id": "ML-ONG-0442",
+    "status": "verified",
+    "country": "Mali",
+    "registered_since": "2016-02-17"
+  },
+  {
+    "name": "Bosnia Yetim Trust",
+    "registry": "Bosnia and Herzegovina Ministry of Justice",
+    "registration_id": "BA-UG-7731",
+    "status": "verified",
+    "country": "Bosnia and Herzegovina",
+    "registered_since": "2012-09-14"
+  },
+  {
+    "name": "Rohingya Relief Collective",
+    "registry": "Bangladesh NGO Affairs Bureau",
+    "registration_id": "BD-NGOAB-3390",
+    "status": "verified",
+    "country": "Bangladesh",
+    "registered_since": "2018-04-22"
+  },
+  {
+    "name": "Masjid Al-Noor Community Association",
+    "registry": "Canada Revenue Agency",
+    "registration_id": "889120334RR0001",
+    "status": "verified",
+    "country": "Canada",
+    "registered_since": "2007-05-19"
+  },
+  {
+    "name": "Noor Relief Network",
+    "registry": "UK Charity Commission",
+    "registration_id": "1142880",
+    "status": "lapsed",
+    "country": "United Kingdom",
+    "registered_since": "2011-07-08",
+    "note": "Registration lapsed 2023-12-31 for non-filing of annual returns. Not a fraud finding."
+  },
+  {
+    "name": "Anadolu Kardeslik Dernegi",
+    "registry": "Turkey Directorate General of Civil Society Relations",
+    "registration_id": "TR-DER-06-1188",
+    "status": "verified",
+    "country": "Turkey",
+    "registered_since": "2015-10-01"
+  },
+  {
+    "name": "Gaza Medical Aid Fund",
+    "registry": "Jordan Ministry of Social Development",
+    "registration_id": "JO-MSD-2041",
+    "status": "verified",
+    "country": "Jordan",
+    "registered_since": "2013-03-28"
+  },
+  {
+    "name": "Sisters United Education Trust",
+    "registry": "Kenya NGO Coordination Board",
+    "registration_id": "KE-NGO-8812",
+    "status": "revoked",
+    "country": "Kenya",
+    "registered_since": "2010-01-15",
+    "note": "Registration revoked 2022-06-01 following a governance audit."
+  },
+  {
+    "name": "Amanah Qurban Services",
+    "registry": "Indonesia Kementerian Sosial",
+    "registration_id": "ID-KEMSOS-5528",
+    "status": "verified",
+    "country": "Indonesia",
+    "registered_since": "2017-08-09"
+  }
+]
