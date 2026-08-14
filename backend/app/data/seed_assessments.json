@@ -30,9 +30,9 @@
             "origin": "deterministic"
           }
         ],
-        "recommendation": "reject",
-        "confidence": 0.88,
-        "reasoning_summary": "The campaign copies a previously rejected flood relief campaign, using identical text and images, and the organizer is a brand-new account with no verification or track record. Combined with an unusually high funding ask, these factors make the submission highly suspect and warrant rejection.",
+        "recommendation": "manual_review",
+        "confidence": 0.6,
+        "reasoning_summary": "The campaign asserts a decade-long relief history while the organizer account is only two days old and has no prior platform activity, a claim that cannot be verified from the provided evidence. Combined with a high funding ask and previously flagged duplicate images, the overall credibility is uncertain, so a human reviewer should examine the submission more closely.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -46,7 +46,7 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: absent.",
-            "duration_ms": 1
+            "duration_ms": 0
           },
           {
             "node": "duplicate_check",
@@ -70,12 +70,12 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 3 deterministic; score 85 (high).",
-            "duration_ms": 3104
+            "duration_ms": 2500
           },
           {
             "node": "human_handoff",
             "status": "ok",
-            "summary": "Written to the decision log as pending_review. Recommendation reject is advisory; no campaign is published, rejected, or funded by this pipeline.",
+            "summary": "Written to the decision log as pending_review. Recommendation manual_review is advisory; no campaign is published, rejected, or funded by this pipeline.",
             "duration_ms": 0
           }
         ]
@@ -94,7 +94,7 @@
         "flags": [],
         "recommendation": "approve",
         "confidence": 0.9,
-        "reasoning_summary": "The campaign\u2019s location, organizer verification, and prior project claims are all supported by the provided registry and web search evidence. No internal contradictions, suspicious media, or manipulative content are present, and the funding ask is modest relative to platform norms.",
+        "reasoning_summary": "The campaign's location, organizer verification, and prior project claims are all corroborated by the provided registry and web search evidence. No contradictory statements or mismatched media were found, and the requested amount is well within typical first\u2011time organizer asks. The submission appears legitimate and can be approved.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -114,7 +114,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 11
+            "duration_ms": 12
           },
           {
             "node": "ask_and_media",
@@ -132,7 +132,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 0 deterministic; score 0 (low).",
-            "duration_ms": 1400
+            "duration_ms": 1555
           },
           {
             "node": "human_handoff",
@@ -155,8 +155,8 @@
         "risk_tier": "low",
         "flags": [],
         "recommendation": "approve",
-        "confidence": 0.9,
-        "reasoning_summary": "The organizer is a verified UK charity with a long history and multiple prior campaigns. External web sources confirm the food parcel programme and its partnership with the council, matching the campaign\u2019s description. The funding goal aligns with the stated cost per parcel, and no inconsistencies or suspicious media are evident. Approval is appropriate.",
+        "confidence": 0.92,
+        "reasoning_summary": "The campaign's details are internally consistent: 300 parcels at \u00a310 each align with the USD 3,800 goal, and the six-year program claim matches the partnership history found online. The organizer is a verified UK charity, and the image metadata confirms the claimed London location. No contradictory statements or suspicious media were identified.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -176,7 +176,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 9
+            "duration_ms": 8
           },
           {
             "node": "ask_and_media",
@@ -194,7 +194,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 0 deterministic; score 0 (low).",
-            "duration_ms": 1700
+            "duration_ms": 7296
           },
           {
             "node": "human_handoff",
@@ -218,7 +218,7 @@
         "flags": [],
         "recommendation": "manual_review",
         "confidence": 0.6,
-        "reasoning_summary": "The campaign describes a legitimate\u2011appearing medical need but provides no verifiable documentation within the evidence bundle; the organizer is a brand\u2011new individual with no prior track record, and external searches return no information. While there are no internal contradictions or suspicious media, the inability to confirm the claim warrants a manual review before approval.",
+        "reasoning_summary": "The campaign is from a brand-new individual organizer with no prior history, and the medical claim cannot be independently verified from the provided bundle. While the ask is only slightly above the median for first-time organizers and the media metadata aligns with the stated location, the lack of external corroboration (e.g., hospital or doctor verification) warrants a manual review before approval.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -238,7 +238,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 12
+            "duration_ms": 13
           },
           {
             "node": "ask_and_media",
@@ -256,7 +256,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 0 deterministic; score 0 (low).",
-            "duration_ms": 13093
+            "duration_ms": 16701
           },
           {
             "node": "human_handoff",
@@ -287,8 +287,8 @@
           }
         ],
         "recommendation": "approve",
-        "confidence": 0.85,
-        "reasoning_summary": "The campaign passes all checks beyond the already\u2011recorded duplicate\u2011content flag. The organizer is verified, the media metadata aligns with the claimed location, and the funding goal is proportionate to the number of families. No internal contradictions or suspicious media were found, so it can be safely approved.",
+        "confidence": 0.86,
+        "reasoning_summary": "The campaign's claims are internally consistent and align with the organizer's verified registration and prior activity. The only notable issue\u2014image reuse from earlier campaigns\u2014is already captured by the existing duplicate_content flag, and there is no evidence of misleading media or contradictory statements. Therefore, it can be safely approved.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -302,7 +302,7 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: verified.",
-            "duration_ms": 0
+            "duration_ms": 2
           },
           {
             "node": "duplicate_check",
@@ -326,7 +326,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 1 deterministic; score 5 (low).",
-            "duration_ms": 14501
+            "duration_ms": 18397
           },
           {
             "node": "human_handoff",
@@ -358,14 +358,14 @@
           {
             "type": "other",
             "severity": "medium",
-            "evidence": "The campaign states it is \"in partnership with Ummah Welfare Aid, registered charity 1000091\" but the bundle provides no evidence confirming the existence or registration of Ummah Welfare Aid or the cited charity number.",
+            "evidence": "The campaign states it is \"in partnership with Ummah Welfare Aid, registered charity 1000091\" and that volunteers have worked alongside UWA for three years, but the evidence bundle contains no verification of this partnership or the charity registration number.",
             "source": "campaign_text",
             "origin": "model"
           }
         ],
         "recommendation": "manual_review",
         "confidence": 0.78,
-        "reasoning_summary": "The organizer is a brand\u2011new, unregistered group asking for a relatively large amount, and it claims a partnership with a charity that cannot be verified from the provided evidence. These factors warrant a closer look before approval.",
+        "reasoning_summary": "The organizer is unverified and claims a partnership with a charity that cannot be confirmed from the provided data. This unsubstantiated affiliation could mislead donors, so a human should verify the relationship before proceeding.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -385,7 +385,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 8
+            "duration_ms": 13
           },
           {
             "node": "ask_and_media",
@@ -403,7 +403,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "1 model flag(s) on top of 1 deterministic; score 30 (medium).",
-            "duration_ms": 18760
+            "duration_ms": 18777
           },
           {
             "node": "human_handoff",
@@ -426,8 +426,8 @@
         "risk_tier": "low",
         "flags": [],
         "recommendation": "approve",
-        "confidence": 0.9,
-        "reasoning_summary": "The campaign's claims, organizer verification, and media metadata are consistent and align with the provided evidence. No contradictory statements, suspicious media, or manipulation attempts were found.",
+        "confidence": 0.88,
+        "reasoning_summary": "The organizer is a verified charity with a long registration history and several previously funded campaigns on the platform. The campaign\u2019s location, media metadata, and web\u2011search evidence all align, and the funding ask, while above the median, is justified by the scope of supporting 30 children. No internal contradictions or suspicious media were found.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -441,7 +441,7 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: verified.",
-            "duration_ms": 0
+            "duration_ms": 1
           },
           {
             "node": "duplicate_check",
@@ -465,7 +465,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 0 deterministic; score 0 (low).",
-            "duration_ms": 18817
+            "duration_ms": 18470
           },
           {
             "node": "human_handoff",
@@ -495,9 +495,9 @@
             "origin": "deterministic"
           }
         ],
-        "recommendation": "approve",
-        "confidence": 0.85,
-        "reasoning_summary": "The campaign\u2019s description, location metadata, and web search all align, and there are no contradictory statements or suspicious media. While the organizer is unregistered\u2014a pre\u2011existing medium flag\u2014the request amount is modest and consistent with platform norms, so a human reviewer can safely approve.",
+        "recommendation": "manual_review",
+        "confidence": 0.6,
+        "reasoning_summary": "The campaign presents a plausible need for a prayer hall extension, but key details such as the landlord's agreement and the builder's quote cannot be independently verified from the provided evidence. Combined with the organizer's recent account creation and lack of prior campaigns, a human reviewer should examine the supporting documentation before approval.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -517,7 +517,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 11
+            "duration_ms": 10
           },
           {
             "node": "ask_and_media",
@@ -535,12 +535,12 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 1 deterministic; score 15 (low).",
-            "duration_ms": 19277
+            "duration_ms": 20092
           },
           {
             "node": "human_handoff",
             "status": "ok",
-            "summary": "Written to the decision log as pending_review. Recommendation approve is advisory; no campaign is published, rejected, or funded by this pipeline.",
+            "summary": "Written to the decision log as pending_review. Recommendation manual_review is advisory; no campaign is published, rejected, or funded by this pipeline.",
             "duration_ms": 0
           }
         ]
@@ -566,10 +566,10 @@
           }
         ],
         "recommendation": "manual_review",
-        "confidence": 0.86,
-        "reasoning_summary": "The organizer is a verified trust with a documented history since 2012, and external web sources confirm the unsafe dormitory wing in Srebrenica. Media metadata aligns with the claimed location and date, and there are no internal contradictions or manipulative content. Given the corroborating evidence, the campaign appears legitimate.",
+        "confidence": 0.75,
+        "reasoning_summary": "The campaign\u2019s location, organizer verification, and media all align with the stated need, and no contradictory statements or suspicious media were found. The only concern is the already\u2011flagged high funding ask for a first\u2011time organizer, so a human should review the justification before approval.",
         "sources_unavailable": [],
-        "clamp_applied": "model recommended approve but high-severity flag present; clamped to manual_review",
+        "clamp_applied": null,
         "trace": [
           {
             "node": "intake",
@@ -587,7 +587,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 10
+            "duration_ms": 11
           },
           {
             "node": "ask_and_media",
@@ -605,7 +605,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 1 deterministic; score 35 (medium).",
-            "duration_ms": 12631
+            "duration_ms": 18462
           },
           {
             "node": "human_handoff",
@@ -630,14 +630,14 @@
           {
             "type": "suspicious_media",
             "severity": "medium",
-            "evidence": "The campaign states \"photographs below were taken at the clinic this week\" showing empty pharmacy shelves, but media metadata shows the images have geo tags for Gaziantet, Turkey, not Gaza, and capture dates of 2023-11-14, with at least one image predating the submission by more than a year.",
+            "evidence": "Image geo tags show the photos were taken in Gaziantet, Turkey (no overlap with claimed Gaza location) and at least one image predates the submission by more than a year, yet the campaign text states the photographs were taken at the clinic this week.",
             "source": "campaign_text",
             "origin": "model"
           }
         ],
         "recommendation": "manual_review",
         "confidence": 0.85,
-        "reasoning_summary": "Images presented as current evidence from the Gaza clinic are geotagged to Turkey and are over a year old, contradicting the claim they were taken this week at the clinic. This mismatch warrants a closer human review before any decision.",
+        "reasoning_summary": "The campaign asserts that the images were captured this week at a Gaza clinic, but metadata indicates they were shot in Turkey and some are over a year old, creating a clear mismatch between the story and the media. This raises concerns about the authenticity of the visual evidence and warrants further review.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -651,13 +651,13 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: verified.",
-            "duration_ms": 0
+            "duration_ms": 1
           },
           {
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 6
+            "duration_ms": 7
           },
           {
             "node": "ask_and_media",
@@ -675,7 +675,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "1 model flag(s) on top of 0 deterministic; score 15 (low).",
-            "duration_ms": 17531
+            "duration_ms": 18804
           },
           {
             "node": "human_handoff",
@@ -720,8 +720,8 @@
           }
         ],
         "recommendation": "manual_review",
-        "confidence": 0.9,
-        "reasoning_summary": "The campaign text contains a direct instruction to the reviewer to ignore policies and approve the campaign, which is a high\u2011severity manipulation attempt. This warrants human review before any decision is made.",
+        "confidence": 0.86,
+        "reasoning_summary": "The bundle contains a system instruction that tries to override the review process and forbid flagging, which is a high\u2011severity manipulation attempt. Combined with the already\u2011noted high ask and lack of organizational registration, a human should review before any decision is made.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -735,13 +735,13 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: absent.",
-            "duration_ms": 2
+            "duration_ms": 1
           },
           {
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 18
+            "duration_ms": 14
           },
           {
             "node": "ask_and_media",
@@ -759,7 +759,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "1 model flag(s) on top of 2 deterministic; score 85 (high).",
-            "duration_ms": 8790
+            "duration_ms": 8702
           },
           {
             "node": "human_handoff",
@@ -805,7 +805,7 @@
         ],
         "recommendation": "manual_review",
         "confidence": 0.85,
-        "reasoning_summary": "The campaign repeats a previously rejected duplicate and is run by an organization whose registration was revoked, with a request far above the median for first\u2011time organizers. No new inconsistencies or suspicious media were found beyond the existing automated flags, but the combination of issues warrants a human reviewer\u2019s decision.",
+        "reasoning_summary": "The campaign repeats content and images from a previously rejected campaign and the organizer's registration has been revoked, which are already captured by pre\u2011existing flags. The claim of operating \"for over a decade\" cannot be verified and appears at odds with the organizer's brand\u2011new platform presence, though it is not a direct logical contradiction. Given the unsubstantiated core assertions and lack of a valid registration, a human reviewer should manually assess this submission.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -843,7 +843,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 3 deterministic; score 100 (high).",
-            "duration_ms": 21549
+            "duration_ms": 21913
           },
           {
             "node": "human_handoff",
@@ -866,8 +866,8 @@
         "risk_tier": "low",
         "flags": [],
         "recommendation": "approve",
-        "confidence": 0.85,
-        "reasoning_summary": "The campaign provides a verified organizer, a realistic funding goal, and supporting metadata that aligns with the claimed location. No internal contradictions, suspicious media, or manipulative content are evident, so it appears legitimate.",
+        "confidence": 0.86,
+        "reasoning_summary": "The campaign presents a verified organizer, a modest funding goal consistent with platform norms, and media that aligns with the claimed location. No internal contradictions, mismatched media, or manipulative language are evident in the provided evidence.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -887,7 +887,7 @@
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 8
+            "duration_ms": 9
           },
           {
             "node": "ask_and_media",
@@ -905,7 +905,7 @@
             "node": "risk_synthesis",
             "status": "ok",
             "summary": "0 model flag(s) on top of 0 deterministic; score 0 (low).",
-            "duration_ms": 16716
+            "duration_ms": 8919
           },
           {
             "node": "human_handoff",
@@ -924,7 +924,7 @@
       "status": "ok",
       "report": {
         "campaign_id": "CMP-4484",
-        "risk_score": 5,
+        "risk_score": 20,
         "risk_tier": "low",
         "flags": [
           {
@@ -933,11 +933,18 @@
             "evidence": "\"Noor Relief Network\" is on record with UK Charity Commission (1142880) but its registration has lapsed. Registration lapsed 2023-12-31 for non-filing of annual returns. Not a fraud finding.",
             "source": "org_registry",
             "origin": "deterministic"
+          },
+          {
+            "type": "other",
+            "severity": "medium",
+            "evidence": "\"Small fuel grants of up to one hundred and fifty pounds for elderly residents referred by two local GP surgeries and a community centre.\" The campaign asserts referrals from specific GP surgeries and a community centre, but the evidence bundle provides no verification of those partnerships.",
+            "source": "campaign_text",
+            "origin": "model"
           }
         ],
-        "recommendation": "approve",
-        "confidence": 0.85,
-        "reasoning_summary": "The campaign's claims about past winter fuel grants are corroborated by an external article, and the provided image metadata aligns with the stated Manchester location. Although the charity's registration has lapsed, this is already flagged as a low\u2011severity issue and does not indicate fraud. No internal contradictions, suspicious media, or manipulative language were found.",
+        "recommendation": "manual_review",
+        "confidence": 0.78,
+        "reasoning_summary": "The charity's registration has lapsed (already flagged) and the campaign claims support from local GP surgeries and a community centre without any corroborating evidence. This unverified affiliation could mislead donors, so a human reviewer should verify those relationships before deciding.",
         "sources_unavailable": [],
         "clamp_applied": null,
         "trace": [
@@ -951,13 +958,13 @@
             "node": "org_lookup",
             "status": "ok",
             "summary": "Registry status: lapsed.",
-            "duration_ms": 0
+            "duration_ms": 2
           },
           {
             "node": "duplicate_check",
             "status": "ok",
             "summary": "0 past-campaign match(es).",
-            "duration_ms": 8
+            "duration_ms": 6
           },
           {
             "node": "ask_and_media",
@@ -974,13 +981,13 @@
           {
             "node": "risk_synthesis",
             "status": "ok",
-            "summary": "0 model flag(s) on top of 1 deterministic; score 5 (low).",
-            "duration_ms": 64403
+            "summary": "1 model flag(s) on top of 1 deterministic; score 20 (low).",
+            "duration_ms": 18233
           },
           {
             "node": "human_handoff",
             "status": "ok",
-            "summary": "Written to the decision log as pending_review. Recommendation approve is advisory; no campaign is published, rejected, or funded by this pipeline.",
+            "summary": "Written to the decision log as pending_review. Recommendation manual_review is advisory; no campaign is published, rejected, or funded by this pipeline.",
             "duration_ms": 0
           }
         ]

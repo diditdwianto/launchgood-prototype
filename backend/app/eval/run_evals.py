@@ -25,7 +25,7 @@ load_dotenv(dotenv_path="../.env")
 
 from ..agent import tools  # noqa: E402
 from ..agent.graph import assess  # noqa: E402
-from ..agent.prompts import JUDGE_SYSTEM  # noqa: E402
+from ..agent.prompts import JUDGE_SYSTEM, SUMMARY_JUDGE_SYSTEM  # noqa: E402
 from ..agent.schemas import RiskReport, Severity  # noqa: E402
 
 CASES = Path(__file__).resolve().parent / "eval_cases.json"
@@ -184,6 +184,48 @@ def judge(report: RiskReport, bundle: str) -> list[dict]:
         temperature=0.0,
     )
     return json.loads(resp.choices[0].message.content)["verdicts"]
+
+
+SUMMARY_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "verdict": {"type": "string", "enum": ["explains", "names_only", "absent"]},
+        "reason": {"type": "string"},
+    },
+    "required": ["verdict", "reason"],
+}
+
+
+def judge_summary(report: RiskReport) -> dict:
+    """Does the summary interpret the flags, or merely name them?
+
+    Keyword matching cannot answer this — "beyond the already-recorded flag" and a
+    real explanation share most of their vocabulary. The distinction is semantic,
+    which is what the judge layer is for.
+    """
+    from groq import Groq
+
+    flags_text = "\n".join(
+        f"- {f.type.value} (severity {f.severity.value}): {f.evidence}" for f in report.flags
+    )
+    client = Groq(api_key=os.environ["groq_api_key"])
+    resp = client.chat.completions.create(
+        model=os.environ.get("groq_model", "openai/gpt-oss-120b"),
+        messages=[
+            {"role": "system", "content": SUMMARY_JUDGE_SYSTEM},
+            {
+                "role": "user",
+                "content": f"=== FLAGS ===\n{flags_text}\n\n=== SUMMARY ===\n{report.reasoning_summary}",
+            },
+        ],
+        response_format={
+            "type": "json_schema",
+            "json_schema": {"name": "summary_audit", "strict": True, "schema": SUMMARY_SCHEMA},
+        },
+        temperature=0.0,
+    )
+    return json.loads(resp.choices[0].message.content)
 
 
 CALIBRATION_BUNDLE = """CAMPAIGN CMP-9999
@@ -351,6 +393,13 @@ def main() -> int:
 
         supported = unsupported = 0
         problems: list[str] = []
+        summary_needed = {
+            c["campaign_id"]
+            for c in spec
+            if c["checks"].get("summary_must_explain_mitigation")
+        }
+        summary_ok = summary_total = 0
+
         for campaign_id, (report, bundle, status) in reports.items():
             if report is None or not report.flags:
                 continue
@@ -362,6 +411,16 @@ def main() -> int:
                     problems.append(
                         f"  {campaign_id} {v['flag_type']}: {v['verdict']} — {v['reason'][:110]}"
                     )
+
+            if campaign_id in summary_needed:
+                audit = judge_summary(report)
+                summary_total += 1
+                if audit["verdict"] == "explains":
+                    summary_ok += 1
+                else:
+                    problems.append(
+                        f"  {campaign_id} summary: {audit['verdict']} — {audit['reason'][:110]}"
+                    )
             time.sleep(1.0)
 
         total_flags = supported + unsupported
@@ -369,6 +428,11 @@ def main() -> int:
         judge_line = f"{supported}/{total_flags} flags judged supported ({pct:.0f}%)"
 
         print(f"\nLLM-AS-JUDGE    {judge_line}")
+        if summary_total:
+            print(
+                f"SUMMARY AUDIT   {summary_ok}/{summary_total} ambiguous-case summaries "
+                f"explain their flags rather than naming them"
+            )
         print(f"CALIBRATION     {calibration_line}")
         if not calibration_ok:
             print(

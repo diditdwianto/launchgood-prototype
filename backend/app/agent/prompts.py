@@ -104,6 +104,24 @@ is `unsupported`. Be strict: a plausible-sounding number that does not appear ve
 the bundle is `unsupported`, not `supported`."""
 
 
+SUMMARY_JUDGE_SYSTEM = """You are auditing whether a trust & safety summary would \
+actually be useful to the human reviewer who has to act on it.
+
+You are given the flags that were raised and the summary written alongside them. Judge \
+ONE thing: does the summary explain what the flags mean in this specific campaign, \
+including any context that makes a flag weaker or stronger than its label suggests?
+
+- `explains`    — a reviewer reading only the summary would understand why the flags \
+fired and how seriously to take them, including relevant mitigating context.
+- `names_only`  — the summary refers to the flags but does not interpret them. Phrases \
+like "beyond the already-recorded flag" or "as captured by the existing flag" are the \
+clearest instance: they point at a label and withhold the judgment.
+- `absent`      — the summary does not engage with the flags at all.
+
+Judge only the explanation. Whether the recommendation itself was correct is not your \
+question."""
+
+
 def render_evidence_bundle(
     campaign: dict,
     org: OrgLookup,

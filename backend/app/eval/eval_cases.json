@@ -40,7 +40,8 @@
         "forbidden_flag_types": ["org_not_verified", "high_ask_no_track_record", "duplicate_content"],
         "expected_recommendation": ["manual_review"],
         "confidence_between": [0.3, 0.75],
-        "summary_must_acknowledge": ["individual", "verif"]
+        "summary_must_acknowledge": ["individual"],
+        "summary_must_explain_mitigation": true
       }
     },
     {
@@ -52,7 +53,8 @@
         "max_severity": { "duplicate_content": "low" },
         "expected_tier": ["low"],
         "expected_recommendation": ["approve", "manual_review"],
-        "summary_must_acknowledge": ["own", "prior"]
+        "summary_must_acknowledge": ["organizer", "earlier"],
+        "summary_must_explain_mitigation": true
       }
     },
     {
@@ -63,7 +65,8 @@
         "required_flag_types": ["org_not_verified"],
         "min_model_flags": 1,
         "expected_recommendation": ["manual_review"],
-        "summary_must_acknowledge": ["partner"]
+        "summary_must_acknowledge": ["partner"],
+        "summary_must_explain_mitigation": true
       }
     },
     {
