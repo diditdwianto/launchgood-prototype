@@ -269,3 +269,36 @@ def _iso(value: datetime | str) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc).isoformat(timespec="seconds")
+
+
+# ----------------------------------------------------------- submitted campaigns
+
+
+def save_campaign(campaign: dict, submitted_by: str) -> None:
+    from psycopg.types.json import Jsonb as _Jsonb
+
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO submitted_campaigns (campaign_id, payload, submitted_by)"
+            " VALUES (%s, %s, %s)"
+            " ON CONFLICT (campaign_id) DO UPDATE SET payload = EXCLUDED.payload",
+            (campaign["campaign_id"], _Jsonb(campaign), submitted_by),
+        )
+
+
+def submitted_campaigns() -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT payload FROM submitted_campaigns ORDER BY submitted_at DESC"
+        ).fetchall()
+    return [r["payload"] for r in rows]
+
+
+def next_campaign_id() -> str:
+    """Continues the CMP-#### series past the fixtures so IDs never collide."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT MAX(CAST(SUBSTRING(campaign_id FROM 5) AS INTEGER)) AS n"
+            " FROM submitted_campaigns WHERE campaign_id ~ '^CMP-[0-9]+$'"
+        ).fetchone()
+    return f"CMP-{max(row['n'] or 0, 4499) + 1}"

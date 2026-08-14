@@ -17,6 +17,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from . import registries
+
 DATA = Path(__file__).resolve().parent.parent / "data"
 
 # An ask is only remarkable relative to what first-time organizers normally raise.
@@ -42,7 +44,7 @@ def get_campaign(campaign_id: str) -> dict | None:
 
 # --------------------------------------------------------------------------- org
 
-OrgStatus = Literal["verified", "lapsed", "revoked", "absent", "not_applicable"]
+OrgStatus = registries.OrgStatus
 
 
 @dataclass
@@ -50,6 +52,12 @@ class OrgLookup:
     status: OrgStatus
     detail: str
     record: dict | None = None
+    provider: str = "mock"
+
+
+def country_of(campaign: dict) -> str:
+    """Country is the last comma-separated part of the claimed location."""
+    return campaign.get("claimed_location", "").split(",")[-1].strip()
 
 
 def org_registry_lookup(campaign: dict) -> OrgLookup:
@@ -58,6 +66,11 @@ def org_registry_lookup(campaign: dict) -> OrgLookup:
     Collapsing these to verified/unverified is the single most common way a tool
     like this becomes useless: it flags every individual and every small
     unincorporated group identically to a charity whose registration was revoked.
+
+    A real registry is consulted when one covers the campaign's country, and the
+    local dataset is the fallback. Which of the two answered is recorded, because
+    "absent from a register we actually queried" and "absent because no register
+    exists for this country" are very different facts to hand a reviewer.
     """
     name = campaign["organizer_name"]
 
@@ -67,6 +80,10 @@ def org_registry_lookup(campaign: dict) -> OrgLookup:
             f"{name} is an individual organizer. Organization registries do not list "
             "private individuals, so a non-match here carries no information either way.",
         )
+
+    live = registries.lookup_live(name, country_of(campaign))
+    if live is not None:
+        return OrgLookup(live.status, live.detail, live.record, live.provider)
 
     record = next((o for o in _load("mock_org_registry.json") if o["name"] == name), None)
 

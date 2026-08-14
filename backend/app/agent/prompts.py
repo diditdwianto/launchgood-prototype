@@ -7,6 +7,7 @@ question about one fixed document rather than about the whole pipeline.
 
 from __future__ import annotations
 
+from . import registries
 from .tools import AskComparison, DuplicateResult, MediaCheck, OrgLookup
 
 SYNTHESIS_SYSTEM = """You are a trust & safety analyst for LaunchGood, a crowdfunding \
@@ -152,7 +153,12 @@ def render_evidence_bundle(
 
     L.append("--- org_registry ---")
     L.append(f"Result: {org.status.upper()}")
+    L.append(f"Source: {'LIVE registry API (' + org.provider + ')' if org.provider != 'mock' else 'local mock dataset'}")
     L.append(org.detail)
+    if org.provider == "mock":
+        # Absence from a register nobody could query is not evidence about the
+        # organizer. Said explicitly so the model does not read it as adverse.
+        L.append(registries.coverage_note(campaign.get("claimed_location", "").split(",")[-1].strip()))
     L.append("")
 
     L.append("--- duplicate_check ---")

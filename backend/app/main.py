@@ -11,12 +11,15 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import JSONResponse, StreamingResponse
+from datetime import datetime, timezone
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 from . import auth, db
 from .agent import scoring, tools
-from .agent.graph import assess
+from .agent.graph import assess, assess_stream
 from .agent.schemas import Decision
 
 load_dotenv()
@@ -38,6 +41,19 @@ def _synthesizer():
 
 
 SEED_FILE = Path(__file__).resolve().parent / "data" / "seed_assessments.json"
+
+
+def all_campaigns() -> list[dict]:
+    """Fixtures plus anything submitted through the console.
+
+    Kept separate at rest — the fixtures are versioned test data the eval suite reads
+    expected outcomes against — but merged for everything the reviewer sees.
+    """
+    return tools.load_campaigns() + db.submitted_campaigns()
+
+
+def find_campaign(campaign_id: str) -> dict | None:
+    return next((c for c in all_campaigns() if c["campaign_id"] == campaign_id), None)
 
 
 def assess_one(campaign: dict) -> None:
@@ -160,7 +176,7 @@ def health() -> dict:
 @app.get("/api/queue")
 def queue() -> dict:
     decided = db.decided_ids()
-    campaigns = {c["campaign_id"]: c for c in tools.load_campaigns()}
+    campaigns = {c["campaign_id"]: c for c in all_campaigns()}
     items = []
 
     for campaign_id, record in db.all_assessments().items():
@@ -193,7 +209,7 @@ def queue() -> dict:
 
 @app.get("/api/campaigns/{campaign_id}")
 def campaign_detail(campaign_id: str) -> dict:
-    campaign = tools.get_campaign(campaign_id)
+    campaign = find_campaign(campaign_id)
     record = db.get_assessment(campaign_id)
     if campaign is None or record is None:
         raise HTTPException(status_code=404, detail="campaign not found")
@@ -231,13 +247,82 @@ def decide(campaign_id: str, body: DecisionRequest) -> dict:
 @app.post("/api/campaigns/{campaign_id}/reassess")
 def reassess(campaign_id: str) -> dict:
     """Re-run the full pipeline live against the model, for this one campaign."""
-    campaign = tools.get_campaign(campaign_id)
+    campaign = find_campaign(campaign_id)
     if campaign is None:
         raise HTTPException(status_code=404, detail="campaign not found")
 
     assess_one(campaign)
     record = db.get_assessment(campaign_id)
     return {"assessment": record["payload"], "assessed_at": record["assessed_at"]}
+
+
+class NewCampaign(BaseModel):
+    title: str = Field(min_length=4, max_length=200)
+    organizer_name: str = Field(min_length=2, max_length=120)
+    organizer_type: Literal["organization", "individual"] = "organization"
+    goal_usd: int = Field(ge=1, le=10_000_000)
+    claimed_location: str = Field(min_length=2, max_length=120)
+    category: str = Field(default="other", max_length=60)
+    # Capped: this text goes into a model prompt, so its length is a cost and a
+    # prompt-injection surface, not just a form field.
+    body: str = Field(min_length=20, max_length=4000)
+    organizer_account_age_days: int = Field(default=1, ge=0, le=20000)
+    prior_campaigns_on_platform: int = Field(default=0, ge=0, le=1000)
+
+
+@app.post("/api/campaigns")
+def submit_campaign(body: NewCampaign, username: str = Depends(auth.current_user)) -> dict:
+    """Accept a campaign. Assessment is a separate, streamed call."""
+    campaign = body.model_dump()
+    campaign["campaign_id"] = db.next_campaign_id()
+    campaign["submitted_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    campaign["images"] = []  # no upload path yet; media checks degrade honestly
+    db.save_campaign(campaign, username)
+    return {"campaign": campaign}
+
+
+@app.get("/api/campaigns/{campaign_id}/assess/stream")
+def assess_streaming(campaign_id: str):
+    """Server-sent events, one per pipeline node, then the finished report.
+
+    The pipeline always ran node by node. Streaming stops hiding that, which is the
+    difference between a verdict appearing fully formed and a reviewer watching the
+    evidence actually being gathered.
+    """
+    campaign = find_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="campaign not found")
+
+    def events():
+        def sse(event: str, data: dict) -> str:
+            return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+        try:
+            bundle = ""
+            result = None
+            for kind, payload in assess_stream(campaign, _synthesizer()):
+                if kind == "node":
+                    yield sse("node", payload.model_dump(mode="json"))
+                elif kind == "result":
+                    result = payload
+                elif kind == "bundle":
+                    bundle = payload
+
+            if result is not None:
+                db.save_assessment(
+                    campaign_id, result.status, result.model_dump(mode="json"), bundle
+                )
+                yield sse("result", result.model_dump(mode="json"))
+        except Exception as exc:  # noqa: BLE001
+            # A stream that dies silently looks identical to one still working, so
+            # failures are sent as an event rather than dropped on the floor.
+            yield sse("failed", {"message": f"{type(exc).__name__}: {exc}"})
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/decisions")

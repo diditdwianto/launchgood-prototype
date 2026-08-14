@@ -383,3 +383,40 @@ def assess(campaign: dict, synthesize: Synthesizer) -> tuple[AssessmentResult, s
 
     report = final["report"].model_copy(update={"trace": trace})
     return AssessmentOk(report=report), final["evidence_bundle"]
+
+
+def assess_stream(campaign: dict, synthesize: Synthesizer):
+    """Yield each node's result as it completes, then the finished assessment.
+
+    The pipeline always ran node by node; nothing about it was ever a single opaque
+    call. Streaming just stops hiding that, which is the difference between a reviewer
+    seeing a finished verdict appear and watching the evidence actually being gathered.
+
+    Yields ("node", NodeTrace) per step, then ("result", AssessmentResult).
+    """
+    graph = build_graph(synthesize)
+    state: dict = {}
+
+    for update in graph.stream({"campaign": campaign}, stream_mode="updates"):
+        for node_name, patch in update.items():
+            for key, value in patch.items():
+                # Mirror the graph's own reducers: annotated keys accumulate, the
+                # rest overwrite. Without this the final state would hold only the
+                # last node's slice of trace and flags.
+                if key in ("trace", "pre_flags", "sources_unavailable"):
+                    state[key] = state.get(key, []) + value
+                else:
+                    state[key] = value
+
+            for trace in patch.get("trace", []):
+                yield "node", trace
+
+    trace = state.get("trace", [])
+    if "error" in state:
+        err = state["error"]
+        yield "result", AssessmentFailed(error=err.model_copy(update={"trace": trace}))
+    else:
+        report = state["report"].model_copy(update={"trace": trace})
+        yield "result", AssessmentOk(report=report)
+
+    yield "bundle", state.get("evidence_bundle", "")
