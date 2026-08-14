@@ -138,9 +138,11 @@ class DecisionLogEntry(BaseModel):
     ai_confidence: float
     ai_risk_score: int
     human_decision: Decision
-    agreed: bool = Field(
-        description="Whether the human decision matched the AI recommendation. "
-        "Disagreement is the drift signal worth monitoring in production."
+    outcome: Literal["agreed", "overrode", "deferred"] = Field(
+        description="`deferred` when the AI recommended manual_review — that is the AI "
+        "declining to predict, so scoring it as agreement or override either way would "
+        "inflate the number. Only decisive recommendations can be agreed with or "
+        "overridden, and the override rate is the drift signal worth monitoring."
     )
     reviewer_note: str = ""
     decided_at: str
