@@ -194,8 +194,9 @@ def reassess(campaign_id: str) -> dict:
 @app.get("/api/decisions")
 def decision_log() -> dict:
     entries = db.decisions()
-    decisive = [e for e in entries if e.outcome != "deferred"]
-    agreed = [e for e in decisive if e.outcome == "agreed"]
+    counts = db.outcome_counts()
+    agreed = counts.get("agreed", 0)
+    decisive = agreed + counts.get("overrode", 0)
     return {
         "entries": [e.model_dump(mode="json") for e in entries],
         "total": len(entries),
@@ -203,6 +204,6 @@ def decision_log() -> dict:
         # decisions from one reviewer who also wrote the labels is an anecdote,
         # not an agreement rate. It is here as the shape of the production
         # monitoring signal, not as a result.
-        "agreement": f"{len(agreed)}/{len(decisive)}",
-        "deferred": len(entries) - len(decisive),
+        "agreement": f"{agreed}/{decisive}",
+        "deferred": counts.get("deferred", 0),
     }

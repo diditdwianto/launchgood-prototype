@@ -154,10 +154,13 @@ These matter more than the obvious ones.
 
 ## Running it
 
-Requires Python 3.13+ (`uv`) and Node 20+. Put `groq_api_key` and `groq_model` in a
-`.env` at the repo root.
+Requires Python 3.13+ (`uv`), Node 20+, and Docker for Postgres. Put `groq_api_key` and
+`groq_model` in a `.env` at the repo root.
 
 ```bash
+# postgres → localhost:55432
+docker compose up -d
+
 # backend  → http://localhost:8000
 cd backend && uv sync && uv run uvicorn app.main:app --reload
 
@@ -214,6 +217,23 @@ can only be recorded after the fact.
 }
 ```
 
+## Storage
+
+Postgres. `database_url` defaults to the `docker compose` instance, so local setup is
+`docker compose up -d` and nothing else — migrations run on boot.
+
+Assessments are a cache and are truncated and re-seeded on every start. **Decisions are
+never dropped**, which is the whole reason this is not a SQLite file: free-tier disks are
+ephemeral, and the decision log is the one artefact here a human authored.
+
+There is deliberately **no foreign key** from `decisions.campaign_id` to `assessments`. A
+foreign key would either block the re-seed or cascade away the one table nobody can
+regenerate.
+
+Constraints live in the schema, not only in Pydantic — `ai_confidence` between 0 and 1,
+`risk_score` between 0 and 100, and the recommendation/decision/outcome enums are all
+`CHECK`ed, so a bug in the app cannot write a decision the domain does not allow.
+
 ## Layout
 
 ```
@@ -226,7 +246,8 @@ backend/app/
     prompts.py        evidence bundle + the three system prompts
     synthesis_llm.py  the Groq call, retry classification, token accounting
   eval/               eval_cases.json, run_evals.py
-  db.py               decision log — SQLite by default, Postgres via `database_url`
+  db.py               decision log and assessment cache (psycopg)
+  migrations/         numbered .sql, applied in order, tracked in schema_migrations
 frontend/app/         queue rail, review/[id], decisions
 ```
 

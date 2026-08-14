@@ -34,8 +34,7 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
    failing. Only models verified to support strict `json_schema` are accepted; the app
    refuses to start otherwise.
    | `cors_origins` | set **after** step 2, to the exact Vercel origin |
-   | `db_path` | `/tmp/trust_copilot.db` (ignored if `database_url` is set) |
-   | `database_url` | *optional* — a Postgres URL; see below |
+   | `database_url` | **required** — the Postgres URL; see step 1a |
    | `PYTHON_VERSION` | `3.13.3` |
 
    Do not set `tavily_api_key` — leaving it unset keeps the demo deterministic.
@@ -45,6 +44,15 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
 
    `assessed:14` is the check that matters. It confirms the seed loaded and the reviewer
    will not open an empty queue.
+
+### 1a. Postgres
+
+Render → **New → PostgreSQL** (the free instance is ample), then copy its **Internal**
+Database URL into the web service as `database_url`. Tables are created on first boot by
+the migration runner; there is no manual setup step.
+
+The decision log lives here and survives redeploys. Assessments still re-seed on every
+start, so only human decisions persist — which is the intent.
 
 ## 2. Frontend → Vercel
 
@@ -105,15 +113,9 @@ Do this against the live URLs, not localhost.
 
 ### Notes
 
-**The decision log resets on redeploy under SQLite**, because free-tier disks are
-ephemeral. Fine for a prototype — but do not record a walkthrough, redeploy, and expect
-your logged decisions to still be there.
-
-**To keep decisions across redeploys, add Postgres.** On Render: New → PostgreSQL (the
-free instance is ample), then copy its *Internal* Database URL into the web service as
-`database_url`. Nothing else changes — tables are created on first boot, and assessments
-still re-seed on startup while decisions persist. Worth doing if you want the decision
-log to still be there when a reviewer opens your link days after you recorded the video.
+**Decisions survive redeploys; assessments do not.** Assessments are a cache rebuilt
+from the committed seed on every boot. That is deliberate — but it means the queue
+resets to 14 pending on each deploy, while anything you decided stays in the log.
 
 **Rebuilding the seed is a local operation.** Run `uv run python -m app.build_seed`, commit
 the updated `backend/app/data/seed_assessments.json`, and push. Never set

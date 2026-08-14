@@ -1,0 +1,23 @@
+# Local Postgres for development. `docker compose up -d` and the backend finds it.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: trust-copilot-db
+    environment:
+      POSTGRES_USER: trustcopilot
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: trustcopilot
+    ports:
+      # 55432 rather than 5432 so this never collides with a Postgres you already run.
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustcopilot -d trustcopilot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

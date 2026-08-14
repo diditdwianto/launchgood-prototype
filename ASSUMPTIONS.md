@@ -45,13 +45,18 @@ parts of the design would change.
 - **No authentication.** A single unguarded reviewer route. There is one reviewer role,
   and "escalate" records the intent to send to a second reviewer without implementing a
   second queue.
-- **Two database backends, for persistence rather than scale.** SQLite by default, with
-  zero setup. Postgres when `database_url` is set. The reason is not load — it is that
-  free-tier hosts have ephemeral disks, so a SQLite file is wiped on every restart and
-  redeploy, taking the decision log with it. That log is the one artefact here a human
-  actually authored, and it is the eval data. On Postgres, assessments are still cleared
-  and re-seeded at startup (they are a cache), but decisions are never dropped.
-  It is a thin dialect shim over two tables, not an ORM or a migration system.
+- **Postgres, for persistence rather than scale.** The original brief said not to build
+  a real database layer; that constraint was lifted deliberately, because the decision
+  log is the one artefact here a human authored and it doubles as the eval data. On a
+  free-tier host the disk is ephemeral, so a SQLite file was being wiped on every
+  restart and redeploy. Assessments are still cleared and re-seeded at startup — they
+  are a cache — but decisions are never dropped.
+
+  Still not an ORM. Two tables, no relations, and the value is in constraints and
+  indexes rather than object mapping, so it is raw psycopg with numbered `.sql`
+  migrations recorded in `schema_migrations`. SQLAlchemy would sit on top of queries
+  worth reading directly, and Alembic would add a config tree for two files of DDL.
+  With relations or a team, that tradeoff flips.
 - **English only.** LaunchGood campaigns span many languages and every fraud signal here
   is weaker outside English: the duplicate-text similarity, the injection detection, and
   the model's reading of campaign claims all degrade. This is a real limitation of the
