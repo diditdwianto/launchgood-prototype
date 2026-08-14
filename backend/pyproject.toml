@@ -1,0 +1,12 @@
+[project]
+name = "backend"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "groq>=1.6.0",
+    "langgraph>=1.2.11",
+    "pydantic>=2",
+    "python-dotenv>=1.2.2",
+    "uvicorn[standard]>=0.52.3",
+]
