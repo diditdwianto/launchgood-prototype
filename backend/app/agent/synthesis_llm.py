@@ -21,7 +21,33 @@ DEFAULT_MODEL = "openai/gpt-oss-20b"
 PRICING: dict[str, tuple[float, float]] = {
     "openai/gpt-oss-20b": (0.075, 0.30),
     "openai/gpt-oss-120b": (0.15, 0.60),
-    "llama-3.3-70b-versatile": (0.59, 0.79),
+    "openai/gpt-oss-safeguard-20b": (0.075, 0.30),
+    "qwen/qwen3.6-27b": (0.60, 3.00),
+}
+
+# Every entry verified by direct API call against the real evidence bundle on
+# 2026-08-14, not from documentation. The whole pipeline depends on strict structured
+# output, so a model that cannot produce it is not a fallback — it is an outage with
+# extra steps. The chain is validated up front so a misconfiguration fails loudly at
+# startup instead of silently at 3am.
+#
+# Confirmed NOT usable, each by direct test:
+#   llama-3.3-70b-versatile, llama-3.1-8b-instant
+#       reject `json_schema` outright.
+#   groq/compound
+#       rejects `json_schema`, and its 429 names `openai/gpt-oss-120b` as the model it
+#       routes to — so it draws on that model's daily quota and cannot be a fallback
+#       for the very model it depends on.
+#   qwen/qwen3.6-27b
+#       accepts the schema and succeeds on short prompts, but returns an empty
+#       generation on the real system prompt plus bundle — it is a reasoning model and
+#       spends its budget before emitting JSON. Allowed, but a poor last resort; it is
+#       deliberately not in the default chain.
+SCHEMA_CAPABLE_MODELS = {
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-safeguard-20b",
+    "qwen/qwen3.6-27b",
 }
 
 
@@ -31,7 +57,17 @@ PRICING: dict[str, tuple[float, float]] = {
 # the whole batch failing. Order it cheapest-capable first.
 def model_chain() -> list[str]:
     raw = os.environ.get("groq_model", DEFAULT_MODEL)
-    return [m.strip() for m in raw.split(",") if m.strip()] or [DEFAULT_MODEL]
+    chain = [m.strip() for m in raw.split(",") if m.strip()] or [DEFAULT_MODEL]
+
+    unusable = [m for m in chain if m not in SCHEMA_CAPABLE_MODELS]
+    if unusable:
+        raise ValueError(
+            f"groq_model contains models that cannot produce strict structured output: "
+            f"{', '.join(unusable)}. The risk report contract depends on it, so these "
+            f"would fail every call rather than act as a fallback. "
+            f"Known-good: {', '.join(sorted(SCHEMA_CAPABLE_MODELS))}."
+        )
+    return chain
 
 
 def model_name() -> str:

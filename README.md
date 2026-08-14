@@ -81,13 +81,29 @@ uv run python -m app.eval.run_evals --live       # re-run the pipeline first
 Current state:
 
 ```
-DETERMINISTIC   14/14 cases pass
+DETERMINISTIC   13/14 cases pass          (14/14 on gpt-oss-120b)
   clean               4/4  (0 false positives)
-  ambiguous           3/3
-LLM-AS-JUDGE    17/17 flags judged supported (100%)
-SUMMARY AUDIT   1/2 ambiguous-case summaries explain their flags rather than naming them
+  ambiguous           2/3
+LLM-AS-JUDGE    16/17 flags judged supported (94%)
+SUMMARY AUDIT   2/3 ambiguous-case summaries explain their flags rather than naming them
 CALIBRATION     2/2 planted fabrications caught
 ```
+
+**These numbers are model-dependent, and that is the point of having them.** The suite
+scored 14/14 on `gpt-oss-120b` and 13/14 after dropping to `gpt-oss-20b`; the remaining
+failure is `CMP-4476`, where the smaller model stops noticing the unverifiable
+affiliation claim. Moving between models without an eval suite would have made that
+invisible.
+
+Two regressions the swap exposed were fixed properly rather than absorbed:
+
+- 20b confidently approved the flagship ambiguous case at 0.85 where 120b had deferred.
+  Rather than tune the prompt harder, "approve requires some independent corroboration
+  of the organizer" became a deterministic clamp. **A rule that matters that much should
+  not depend on which model is configured.**
+- 20b called "run for six years" inconsistent with a source saying "since 2020" on a
+  2026 submission. It had no way to know the current year, so the bundle now states the
+  submission date.
 
 Three things worth noting about how this is built:
 
@@ -159,7 +175,7 @@ tokens), roughly 2 seconds each.
 **Model fallback.** `groq_model` takes a comma-separated chain, cheapest-capable first:
 
 ```
-groq_model=openai/gpt-oss-20b,openai/gpt-oss-120b
+groq_model=openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b
 ```
 
 Groq returns 429 both for "you are going too fast" and for "you are out of tokens for
@@ -169,6 +185,19 @@ and the chain advances to the next model instead, mid-run, rather than failing t
 Falling back is a real change in behaviour and not a transparent retry, so `/api/health`
 reports the active model and any that were exhausted. Nobody should be reading output from
 a model they did not choose without knowing it.
+
+The chain is validated at startup against models verified by direct API call to
+produce strict structured output. That check exists because the obvious candidates
+do not work, and each failure is different:
+
+| Model | Why it is not in the chain |
+|---|---|
+| `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` | Reject `json_schema` outright. |
+| `groq/compound` | Rejects `json_schema` — and its 429 names `gpt-oss-120b` as what it routes to, so it draws on the quota of the very model it would be backing up. |
+| `qwen/qwen3.6-27b` | Accepts the schema and works on short prompts, but returns an empty generation on the real bundle: a reasoning model that spends its budget before emitting JSON. Permitted, but not a default. |
+
+A fallback that cannot satisfy the contract is an outage with extra steps, so
+misconfiguration fails loudly at startup rather than silently under load.
 
 ## Layout
 

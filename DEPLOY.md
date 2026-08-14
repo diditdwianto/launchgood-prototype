@@ -27,7 +27,12 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
    | Key | Value |
    |---|---|
    | `groq_api_key` | your key |
-   | `groq_model` | `openai/gpt-oss-20b,openai/gpt-oss-120b` (chain, cheapest first) |
+   | `groq_model` | `openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b` |
+
+   The model value is a fallback chain, cheapest first. Each model has its own daily
+   token quota, so when one runs out the next takes over mid-run instead of the batch
+   failing. Only models verified to support strict `json_schema` are accepted; the app
+   refuses to start otherwise.
    | `cors_origins` | set **after** step 2, to the exact Vercel origin |
    | `db_path` | `/tmp/trust_copilot.db` |
    | `PYTHON_VERSION` | `3.13.3` |
