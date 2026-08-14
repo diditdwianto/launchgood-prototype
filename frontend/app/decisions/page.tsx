@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Empty, SectionLabel } from "@/components/ui";
-import { getDecisions, type DecisionEntry } from "@/lib/api";
+import { getDecisions, Unauthorized, type DecisionEntry } from "@/lib/api";
 
 const OUTCOME_STYLE: Record<DecisionEntry["outcome"], string> = {
   agreed: "bg-low-tint text-low",
@@ -19,7 +19,7 @@ export default function DecisionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getDecisions().then(setData).catch((e) => setError(String(e)));
+    getDecisions().then(setData).catch((e) => e instanceof Unauthorized ? (window.location.href = "/login") : setError(String(e)));
   }, []);
 
   if (error) return <Empty title="Could not load the decision log" hint={error} />;

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { getQueue, timeAgo, usd, type QueueItem } from "@/lib/api";
+import {
+  getQueue,
+  timeAgo,
+  Unauthorized,
+  usd,
+  type QueueItem,
+} from "@/lib/api";
 import { TierBadge } from "./ui";
 
 export const QUEUE_CHANGED = "queue-changed";
@@ -21,7 +27,7 @@ export default function QueueRail() {
         setItems(d.items);
         setError(null);
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => e instanceof Unauthorized ? (window.location.href = "/login") : setError(String(e)))
       .finally(() => setLoaded(true));
   }, []);
 

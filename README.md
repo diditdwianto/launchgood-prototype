@@ -217,6 +217,31 @@ can only be recorded after the fact.
 }
 ```
 
+## Trying it live
+
+The seeded queue is the fast path. To see the pipeline actually run:
+
+**Submit a campaign** (nav bar) runs the real graph against whatever you type and
+streams each node as it completes — registry lookup, duplicate comparison, ask ratio,
+search, model synthesis — with real timings. "Fill in a real example" uses an actual
+US-registered charity, so the registry step performs a genuine live API call rather
+than reading a fixture.
+
+Two things worth doing on camera:
+
+- Put an instruction to the model in the campaign text. It gets flagged rather than
+  obeyed, and the deterministic flags cannot be talked out of at all.
+- Submit the same organiser with a non-US location. The registry step falls back to
+  the local dataset and says so, because no live register covers that country.
+
+**Sign in** is required — the console approves and rejects live fundraising campaigns,
+and once a form triggers model calls an open endpoint is also someone else's bill.
+Create an account with:
+
+```bash
+cd backend && uv run python -m app.create_user yourname
+```
+
 ## Storage
 
 Postgres. `database_url` defaults to the `docker compose` instance, so local setup is
@@ -246,7 +271,9 @@ backend/app/
     prompts.py        evidence bundle + the three system prompts
     synthesis_llm.py  the Groq call, retry classification, token accounting
   eval/               eval_cases.json, run_evals.py
-  db.py               decision log and assessment cache (psycopg)
+  db.py               decision log, assessment cache, submitted campaigns
+  auth.py             scrypt hashing + signed bearer tokens, stdlib only
+  agent/registries.py real registry providers (ProPublica live, Charity Commission)
   migrations/         numbered .sql, applied in order, tracked in schema_migrations
 frontend/app/         queue rail, review/[id], decisions
 ```

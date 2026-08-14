@@ -9,6 +9,8 @@ import { Empty, SectionLabel, TierBadge } from "@/components/ui";
 import {
   getCampaign,
   postDecision,
+  reassess as reassessCampaign,
+  Unauthorized,
   usd,
   type CampaignDetail,
   type Decision,
@@ -32,7 +34,7 @@ export default function ReviewPage() {
         setData(d);
         setError(null);
       })
-      .catch((e) => setError(String(e)));
+      .catch((e) => e instanceof Unauthorized ? (window.location.href = "/login") : setError(String(e)));
   }, [id]);
 
   useEffect(() => {
@@ -58,11 +60,7 @@ export default function ReviewPage() {
   async function reassess() {
     setBusy("reassess");
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000"}/api/campaigns/${id}/reassess`,
-        { method: "POST" },
-      );
-      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      await reassessCampaign(id);
       load();
       window.dispatchEvent(new Event(QUEUE_CHANGED));
     } catch (e) {

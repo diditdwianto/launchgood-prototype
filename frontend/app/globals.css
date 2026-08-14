@@ -42,3 +42,16 @@ body {
 ::selection {
   background: var(--color-brand-tint);
 }
+
+.input {
+  width: 100%;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  font-size: 13.5px;
+  outline: none;
+}
+.input:focus {
+  border-color: var(--color-brand);
+}
