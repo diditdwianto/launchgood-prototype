@@ -72,6 +72,7 @@ def seed() -> None:
 async def lifespan(app: FastAPI):
     seed()
     yield
+    db.close()
 
 
 app = FastAPI(title="Campaign Trust & Compliance Copilot", lifespan=lifespan)
@@ -92,6 +93,7 @@ def health() -> dict:
         "ok": True,
         "synthesizer": _synthesizer().__name__,
         "search_provider": tools.get_search_provider().name,
+        "database": db.backend(),
         "assessed": len(db.all_assessments()),
         "model_chain": synthesis_llm.model_chain(),
         "active_model": synthesis_llm.model_name(),

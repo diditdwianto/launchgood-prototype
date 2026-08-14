@@ -226,7 +226,7 @@ backend/app/
     prompts.py        evidence bundle + the three system prompts
     synthesis_llm.py  the Groq call, retry classification, token accounting
   eval/               eval_cases.json, run_evals.py
-  db.py               decision log
+  db.py               decision log — SQLite by default, Postgres via `database_url`
 frontend/app/         queue rail, review/[id], decisions
 ```
 

@@ -45,7 +45,13 @@ parts of the design would change.
 - **No authentication.** A single unguarded reviewer route. There is one reviewer role,
   and "escalate" records the intent to send to a second reviewer without implementing a
   second queue.
-- **No production database.** SQLite, recreated on each start.
+- **Two database backends, for persistence rather than scale.** SQLite by default, with
+  zero setup. Postgres when `database_url` is set. The reason is not load — it is that
+  free-tier hosts have ephemeral disks, so a SQLite file is wiped on every restart and
+  redeploy, taking the decision log with it. That log is the one artefact here a human
+  actually authored, and it is the eval data. On Postgres, assessments are still cleared
+  and re-seeded at startup (they are a cache), but decisions are never dropped.
+  It is a thin dialect shim over two tables, not an ORM or a migration system.
 - **English only.** LaunchGood campaigns span many languages and every fraud signal here
   is weaker outside English: the duplicate-text similarity, the injection detection, and
   the model's reading of campaign claims all degrade. This is a real limitation of the
