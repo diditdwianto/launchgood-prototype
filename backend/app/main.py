@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -34,24 +36,36 @@ def _synthesizer():
     return stub_synthesize
 
 
-def seed() -> None:
-    """Assess every campaign on startup so the reviewer never hits an empty queue.
+SEED_FILE = Path(__file__).resolve().parent / "data" / "seed_assessments.json"
 
-    Run concurrently: fourteen sequential model calls would make cold start
-    unpleasant, especially on a free-tier host.
+
+def assess_one(campaign: dict) -> None:
+    result, bundle = assess(campaign, _synthesizer())
+    db.save_assessment(
+        campaign["campaign_id"], result.status, result.model_dump(mode="json"), bundle
+    )
+
+
+def seed() -> None:
+    """Load pre-computed assessments so the queue is populated the instant the
+    service starts, with no empty state and no cold-start dependency on the model API.
+
+    Regenerate with `uv run python -m app.build_seed`. The live pipeline stays
+    demonstrable through POST /reassess, which re-runs a single campaign for real.
+    This keeps a recorded walkthrough from resting on fourteen cold API calls all
+    landing inside a free tier's rate limit.
     """
     db.init(reset=True)
-    synthesize = _synthesizer()
-    campaigns = tools.load_campaigns()
 
-    def one(campaign: dict) -> None:
-        result, bundle = assess(campaign, synthesize)
-        db.save_assessment(
-            campaign["campaign_id"], result.status, result.model_dump(mode="json"), bundle
-        )
+    if SEED_FILE.exists() and os.environ.get("reassess_on_start") != "1":
+        for campaign_id, record in json.loads(SEED_FILE.read_text()).items():
+            db.save_assessment(
+                campaign_id, record["status"], record["payload"], record["bundle"]
+            )
+        return
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        list(pool.map(one, campaigns))
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        list(pool.map(assess_one, tools.load_campaigns()))
 
 
 @asynccontextmanager
@@ -149,6 +163,18 @@ def decide(campaign_id: str, body: DecisionRequest) -> dict:
     report = RiskReport.model_validate(record["payload"]["report"])
     entry = db.record_decision(report, body.decision, body.reviewer_note)
     return {"logged": entry.model_dump(mode="json")}
+
+
+@app.post("/api/campaigns/{campaign_id}/reassess")
+def reassess(campaign_id: str) -> dict:
+    """Re-run the full pipeline live against the model, for this one campaign."""
+    campaign = tools.get_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="campaign not found")
+
+    assess_one(campaign)
+    record = db.get_assessment(campaign_id)
+    return {"assessment": record["payload"], "assessed_at": record["assessed_at"]}
 
 
 @app.get("/api/decisions")

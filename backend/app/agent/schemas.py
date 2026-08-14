@@ -17,6 +17,18 @@ class FlagType(str, Enum):
     other = "other"
 
 
+# Owned by the tool nodes. A registry match, a fingerprint collision and a ratio
+# are lookups and arithmetic — settled facts, not judgments. The model is barred
+# from emitting these types at all: observed producing high_ask_no_track_record
+# for an ask at 1.09x the median, which the deterministic layer had correctly
+# declined to raise.
+DETERMINISTIC_FLAG_TYPES: set[str] = {
+    "org_not_verified",
+    "duplicate_content",
+    "high_ask_no_track_record",
+}
+
+
 class Severity(str, Enum):
     low = "low"
     medium = "medium"
@@ -40,7 +52,16 @@ Recommendation = Literal["approve", "manual_review", "reject"]
 Decision = Literal["approve", "reject", "escalate"]
 
 
-class Flag(BaseModel):
+class ModelFlag(BaseModel):
+    """A flag as the LLM is allowed to express it.
+
+    Strict json_schema mode requires every property to appear in `required`, so a
+    field with a default cannot be part of the model's contract. That constraint
+    happens to enforce the right design: `origin` is pipeline metadata recording
+    who authored the flag, and letting the model set it would let it claim its own
+    judgments were deterministic lookups.
+    """
+
     model_config = ConfigDict(extra="forbid")
 
     type: FlagType
@@ -51,8 +72,10 @@ class Flag(BaseModel):
     )
     source: Source
 
-    # Set by the pipeline, not the model: deterministic pre-flags are facts from a
-    # tool lookup, model-authored flags are judgments. The UI distinguishes them.
+
+class Flag(ModelFlag):
+    # Deterministic pre-flags are facts from a tool lookup; model flags are
+    # judgments. The UI labels them differently so a reviewer knows which is which.
     origin: Literal["deterministic", "model"] = "model"
 
 
@@ -65,7 +88,7 @@ class SynthesisDraft(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    flags: list[Flag]
+    flags: list[ModelFlag]
     recommendation: Recommendation
     confidence: float = Field(ge=0.0, le=1.0)
     reasoning_summary: str = Field(

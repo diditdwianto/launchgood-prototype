@@ -17,6 +17,7 @@ from langgraph.graph import END, START, StateGraph
 
 from . import prompts, scoring, tools
 from .schemas import (
+    DETERMINISTIC_FLAG_TYPES,
     AssessmentError,
     AssessmentFailed,
     AssessmentOk,
@@ -297,7 +298,6 @@ def _merge_flags(pre_flags: list[Flag], model_flags: list[Flag], state: Assessme
     every submission would double latency and cost for prototype-scale benefit.
     """
     kept = list(pre_flags)
-    claimed_types = {f.type for f in pre_flags}
 
     ran_empty: set[Source] = set(state.get("sources_unavailable", []))
     if not state.get("search_results"):
@@ -306,11 +306,13 @@ def _merge_flags(pre_flags: list[Flag], model_flags: list[Flag], state: Assessme
         ran_empty.add(Source.duplicate_check)
 
     for flag in model_flags:
-        if flag.type in claimed_types:
+        # Reserved types are settled by lookup. If the tool node did not raise one,
+        # the answer is no, and the model does not get a second vote.
+        if flag.type.value in DETERMINISTIC_FLAG_TYPES:
             continue
         if flag.source in ran_empty:
             continue
-        kept.append(flag.model_copy(update={"origin": "model"}))
+        kept.append(Flag(**flag.model_dump(), origin="model"))
 
     return kept
 
