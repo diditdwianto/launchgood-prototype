@@ -236,6 +236,12 @@ Two things worth doing on camera:
 - Submit the same organiser with a non-US location. The registry step falls back to
   the local dataset and says so, because no live register covers that country.
 
+**Under the hood** (nav bar) explains the pipeline in plain terms and reports the
+model layer live: the fallback chain, per-model pricing, remaining per-minute tokens,
+token spend this process, and which evidence sources are real versus mocked.
+"Check live limits" refreshes the rate-limit headers — off by default, so opening the
+page does not quietly consume the quota it reports on.
+
 **Sign in** is required — the console approves and rejects live fundraising campaigns,
 and once a form triggers model calls an open endpoint is also someone else's bill.
 Create an account with:

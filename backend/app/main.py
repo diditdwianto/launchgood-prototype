@@ -325,6 +325,34 @@ def assess_streaming(campaign_id: str):
     )
 
 
+@app.get("/api/telemetry")
+def telemetry(probe: bool = False) -> dict:
+    """What this console is actually running on.
+
+    `probe=1` spends a handful of tokens per model to refresh rate-limit headers,
+    because Groq only discloses them on a response. Off by default so opening the
+    page does not quietly consume the quota it is reporting on.
+    """
+    from .agent import registries, synthesis_llm
+
+    if probe:
+        synthesis_llm.probe_limits()
+
+    data = synthesis_llm.telemetry()
+    data["search"] = {
+        "provider": tools.get_search_provider().name,
+        "live": tools.get_search_provider().name != "mock",
+    }
+    data["registries"] = [
+        {"name": p.name, "covers_example": "United States" if p.name == "propublica" else "United Kingdom"}
+        for p in registries.live_providers()
+    ]
+    data["database"] = db.backend()
+    data["scoring"] = scoring.explain()
+    data["captured_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return data
+
+
 @app.get("/api/decisions")
 def decision_log() -> dict:
     entries = db.decisions()

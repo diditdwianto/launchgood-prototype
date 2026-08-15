@@ -49,6 +49,9 @@ export default function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/submit" className="hover:text-ink transition-colors">
               Submit a campaign
             </Link>
+            <Link href="/under-the-hood" className="hover:text-ink transition-colors">
+              Under the hood
+            </Link>
             <Link href="/decisions" className="hover:text-ink transition-colors">
               Decision log
             </Link>

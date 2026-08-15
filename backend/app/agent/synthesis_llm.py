@@ -379,3 +379,67 @@ def llm_synthesize(bundle: str, preexisting: str, pre_flags: list[Flag]) -> Synt
             },
         ]
         return SynthesisDraft.model_validate_json(_call(messages))
+
+
+def probe_limits() -> None:
+    """Refresh rate-limit headers for every model in the chain.
+
+    Groq only reveals limits on a response, so knowing where a model stands costs a
+    request. This sends the smallest one possible — a single completion token, on the
+    order of ten tokens billed — purely to read the headers.
+
+    Probing an exhausted model is worth doing rather than skipping: the 429 is the
+    only place the per-day quota is ever stated, so a model that has run out is
+    precisely the one that will tell you its ceiling.
+    """
+    for model in model_chain():
+        try:
+            raw = _get_client().chat.completions.with_raw_response.create(
+                model=model,
+                messages=[{"role": "user", "content": "ping"}],
+                max_completion_tokens=1,
+            )
+            _record_headers(model, raw.headers)
+        except Exception as exc:  # noqa: BLE001
+            response = getattr(exc, "response", None)
+            if response is not None:
+                _record_headers(model, response.headers)
+            if _is_quota_exhausted(exc):
+                _record_daily_quota(model, exc)
+                _exhausted.add(model)
+
+
+def telemetry() -> dict:
+    """Everything the console knows about its own model layer."""
+    chain = model_chain()
+    per_model = usage.by_model
+
+    models = []
+    for position, model in enumerate(chain, start=1):
+        spent = per_model.get(model, {"calls": 0, "prompt": 0, "completion": 0})
+        price_in, price_out = PRICING.get(model, (0.0, 0.0))
+        models.append(
+            {
+                "model": model,
+                "position": position,
+                "active": model == model_name(),
+                "exhausted": model in _exhausted,
+                "pricing": {"input_per_mtok": price_in, "output_per_mtok": price_out},
+                "limits": _limits.get(model, {}),
+                "usage": {
+                    **spent,
+                    "usd": round(
+                        (spent["prompt"] * price_in + spent["completion"] * price_out)
+                        / 1_000_000,
+                        5,
+                    ),
+                },
+            }
+        )
+
+    return {
+        "provider": "Groq",
+        "chain": models,
+        "schema_capable_models": sorted(SCHEMA_CAPABLE_MODELS),
+        "totals": usage.summary(),
+    }
