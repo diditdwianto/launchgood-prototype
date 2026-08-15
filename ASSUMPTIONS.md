@@ -84,6 +84,14 @@ parts of the design would change.
   decisions that number would be an anecdote dressed as a metric. The decision log
   captures the data and defines it as the production drift signal; it does not claim a
   result today.
+- **The AI can rarely fully clear a campaign outside a handful of countries, by
+  design.** Recommending `approve` now requires the organizer's identity to be
+  confirmed by a registry, and no live registry covers most of the 130+ countries this
+  platform serves. Most legitimate campaigns therefore reach the reviewer as
+  `manual_review` rather than as `approve`. That is the honest output: the system
+  cannot verify who submitted them, and saying so is better than substituting an
+  organisation's fame for a check on the submitter.
+
 - **Model-authored flags vary between runs; deterministic flags do not.** At temperature
   0.2, re-running the same campaign can produce a different set of model flags — `CMP-4480`
   scored 15 in one run and 30 in another, as the model raised one concern versus two about

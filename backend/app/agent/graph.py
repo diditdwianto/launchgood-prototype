@@ -258,15 +258,21 @@ def make_risk_synthesis(synthesize: Synthesizer):
         risk_score = scoring.score(flags)
         risk_tier = scoring.tier(risk_score)
 
-        # Corroboration means something outside the submission itself vouches for the
-        # organizer: a registry record, or any search result. An individual with a new
-        # account and no web presence has neither, which is not adverse but is also not
-        # a basis on which a human should be told "safe to approve".
+        # Corroboration here means IDENTITY corroboration: something outside the
+        # submission vouches that this organizer is who they say they are. Only a
+        # registry hit does that — being found on a register, in any state, is a match
+        # against the named entity.
+        #
+        # Web search results deliberately do NOT count, and this was a real bug. A
+        # campaign submitted as "BAZNAS", Indonesia's national zakat agency, returned
+        # abundant search evidence that BAZNAS exists and is legitimate, and the
+        # pipeline read that as corroboration of a 30-day-old account with no history.
+        # Search corroborates that an ORGANISATION EXISTS; it says nothing about
+        # whether the SUBMITTER is that organisation. Conflating the two makes the
+        # best-known charities the easiest to impersonate, because the more famous the
+        # name, the more supporting evidence a search returns.
         org = state.get("org")
-        corroborated = bool(
-            (org is not None and org.status in ("verified", "lapsed", "revoked"))
-            or state.get("search_results")
-        )
+        corroborated = org is not None and org.status in ("verified", "lapsed", "revoked")
 
         recommendation, clamp_note = scoring.clamp(
             draft.recommendation, risk_tier, flags, corroborated

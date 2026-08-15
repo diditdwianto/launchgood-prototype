@@ -64,6 +64,19 @@ What is left for the model is the part no rules engine can do — and it is the 
 | The model cites a source the schema forbids | Fixed at the root: the bundle's section headers and the `Source` enum are one contract, and a test fails if they drift. A schema rejection is also fed back into the conversation rather than blind-retried. |
 | The campaign text tries to instruct the model | Treated as untrusted input, ignored, and recorded as a high-severity flag. Test case `CMP-4481`. |
 
+**Search proves existence, never identity.** Found by submitting a live campaign named
+after BAZNAS, Indonesia's national zakat agency. Search returned abundant evidence that
+BAZNAS is real and official, and the pipeline read that as corroboration of a
+30-day-old account with no history — approving it at 0.8 confidence. The two claims are
+separate: *this organisation is legitimate* and *this submitter is that organisation*.
+Conflating them makes the best-known charities the easiest to impersonate, because the
+more famous the name, the more supporting material a search returns.
+
+Identity corroboration now requires a registry hit; web presence does not count. The
+same campaign is now `manual_review` at 0.6 with the summary "possible impersonation of
+a well-known charity". This lives in `scoring.clamp` rather than only in the prompt —
+it is the second rule moved into code after a model talked itself out of it.
+
 One honest characteristic: **model-authored flags vary between runs, deterministic ones do
 not.** Re-running `CMP-4480` produced a score of 15 once and 30 another time, as the model
 raised one concern versus two about the same geo-tag mismatch. The variance is bounded to

@@ -50,20 +50,24 @@ def clamp(
     judgment calls. Every override is returned so it can be logged and surfaced —
     the rate at which this fires is itself a signal about model calibration.
 
-    `corroborated` is false when no source independently confirms anything about the
-    organizer — no registry record and no search result. This started as a prompt
-    instruction ("an unverifiable story is a reason not to be confident") and was
-    moved into code after `gpt-oss-20b` ignored it and confidently approved
-    CMP-4474 at 0.85, where the larger model had correctly deferred. A rule that
-    matters this much should not depend on which model is configured.
+    `corroborated` is false when nothing independently confirms the organizer's
+    IDENTITY — meaning no registry record. Web presence is not identity: a campaign
+    can name a real, famous organisation and be submitted by anyone.
+
+    This started as a prompt instruction and was moved into code twice over. First
+    after `gpt-oss-20b` confidently approved CMP-4474 where the larger model deferred;
+    then again after a live submission naming Indonesia's national zakat agency was
+    approved at 0.8 because search confirmed the agency exists. A rule that matters
+    this much should not depend on which model is configured, nor on how well known
+    the organisation being claimed happens to be.
     """
     has_high = any(f.severity is Severity.high for f in flags)
 
     if recommendation == "approve" and not corroborated:
         return (
             "manual_review",
-            "no independent corroboration of the organizer from any source, so approval "
-            "would rest entirely on unverifiable claims; clamped to manual_review",
+            "the organizer's identity is not confirmed by any registry, so approval "
+            "would rest on unverified self-description; clamped to manual_review",
         )
 
     if recommendation == "approve" and (risk_tier is RiskTier.high or has_high):
