@@ -9,37 +9,37 @@ const PIPELINE = [
   {
     node: "intake",
     owner: "code",
-    what: "Normalises the submission and rejects anything missing required fields.",
+    what: "Normalises the submission. Rejects anything missing a required field.",
   },
   {
     node: "org_lookup",
     owner: "code",
-    what: "Checks the organiser against a registry. Four states — verified, lapsed, revoked, absent — plus not-applicable for individuals, who are never listed in an org register.",
+    what: "Checks the organiser against a registry. Returns one of five states: verified, lapsed, revoked, absent, or not-applicable for individuals.",
   },
   {
     node: "duplicate_check",
     owner: "code",
-    what: "Text similarity against past campaigns, plus image-fingerprint overlap. Severity comes from provenance: reusing your own successful campaign's photos is not the same act as reusing a rejected stranger's.",
+    what: "Compares body text and image fingerprints against past campaigns. Severity is set by provenance, not by similarity score.",
   },
   {
     node: "ask_and_media",
     owner: "code",
-    what: "Ask as a ratio of the median first-time ask, and image geo/date metadata against the claimed location. Computes the facts; raises a flag only for the ratio.",
+    what: "Computes the ask as a ratio of the median first-time ask. Compares image geo tags and capture dates against the claimed location. Raises a flag for the ratio only.",
   },
   {
     node: "web_search",
     owner: "code",
-    what: "Looks for independent corroboration of the organiser.",
+    what: "Searches for independent mentions of the organiser.",
   },
   {
     node: "risk_synthesis",
     owner: "model",
-    what: "Reads everything gathered and decides what the automated checks could not: whether claims contradict each other, whether media fits the story, whether someone is trying to manipulate the reviewer.",
+    what: "Reads the assembled evidence. Adds flags for contradictions, media mismatches and manipulation attempts. Writes the reviewer summary.",
   },
   {
     node: "human_handoff",
     owner: "human",
-    what: "Writes the report as pending_review. The hard boundary — nothing downstream of this executes, because there is no downstream.",
+    what: "Writes the report as pending_review. No step runs after this one.",
   },
 ];
 
@@ -48,36 +48,36 @@ const SPLIT = [
   ["Do these images appear in a past campaign?", "code", "A set intersection."],
   ["Is this ask unusual?", "code", "A ratio against the median."],
   [
-    "Is the ask 6× the median because it's fraud, or because it's a hospital?",
+    "Is a 6× ask fraud, or a hospital bill?",
     "model",
     "Judgment.",
   ],
   ["Do these claims contradict each other?", "model", "Requires reading."],
-  ["What is the risk score?", "code", "So “why 78?” has an answer."],
-  ["What happens to this campaign?", "human", "Always."],
+  ["What is the risk score?", "code", "Arithmetic from flags."],
+  ["Approve, reject, or escalate?", "human", "Never delegated."],
 ] as const;
 
 const OWNERS = [
   {
     key: "code",
     title: "Code",
-    rule: "Owns anything settled by a lookup or arithmetic.",
-    wrongness:
-      "A deterministic function: same input, same output, always. It can be wrong — but only because the rule is wrong, and then it is wrong identically on every campaign, which makes it findable and fixable.",
+    rule: "Campaign filtering by lookup or arithmetic.",
+    detail:
+      "Deterministic function to filter campaigns based on pre-defined rules. Same input, same output.",
   },
   {
     key: "model",
     title: "Model",
-    rule: "Owns only what cannot be written as a rule.",
-    wrongness:
-      "A language model reading text and exercising judgment. It can be wrong differently on each run, so it is never given anything that has to be reproducible — no scores, no arithmetic, no lookups.",
+    rule: "Campaign filtering by using AI.",
+    detail:
+      "A language model exercising judgment from system input that cannot be enumerated as a rule by Code.",
   },
   {
     key: "human",
     title: "Human",
-    rule: "Owns the decision. Always.",
-    wrongness:
-      "Code computes and the model recommends; neither approves anything. A person can be wrong too, but they can see every piece of evidence behind the recommendation, and their name is on the outcome.",
+    rule: "Campaign decision by a reviewer.",
+    detail:
+      "The only actor that approves, rejects, or escalates. Code and Model produce recommendations only.",
   },
 ];
 
@@ -115,18 +115,15 @@ export default function UnderTheHoodPage() {
         Under the hood
       </h1>
       <p className="text-muted mb-8 max-w-[660px] text-[13.5px] leading-relaxed">
-        A campaign goes through seven steps. Five gather evidence with ordinary code,
-        one asks a language model to read that evidence, and the last one stops and
-        waits for a person. The interesting design decision is not which model is
-        used — it is <em>where the line sits</em> between those three.
+        A campaign passes through seven steps. Five gather evidence using code, one
+        uses a language model, one stops for a human. Each step below is labelled by
+        which of the three owns its decision.
       </p>
 
       {!data.signed_in ? (
         <p className="bg-panel border-brand/40 text-muted mb-8 max-w-[660px] rounded-lg border border-l-[3px] px-4 py-3 text-[13px] leading-relaxed">
-          You are reading this signed out, which is intentional — the design should be
-          inspectable without an account. The reviewer console itself needs one, because
-          it approves and rejects live fundraising campaigns and its submit form spends
-          real model tokens.
+          Signed out. This page is public. The reviewer console requires an account:
+          it approves and rejects campaigns, and the submit form spends model tokens.
         </p>
       ) : null}
 
@@ -143,29 +140,24 @@ export default function UnderTheHoodPage() {
               <span className="text-[13px] font-semibold">{o.title}</span>
             </div>
             <p className="text-ink mb-1.5 text-[12.5px] font-medium">{o.rule}</p>
-            <p className="text-muted text-[12px] leading-relaxed">{o.wrongness}</p>
+            <p className="text-muted text-[12px] leading-relaxed">{o.detail}</p>
           </div>
         ))}
       </div>
       <p className="text-muted mb-8 max-w-[660px] text-[12.5px] leading-relaxed">
-        The split is not about who touches the data — it is about{" "}
-        <strong className="text-ink font-medium">
-          who can be held to what kind of wrongness
-        </strong>
-        . Two consequences worth knowing:
+        Two clarifications.
         <br />
         <br />
-        The label marks who owns the <em>decision</em> in a step, not who does the work
-        in it. <span className="mono text-[11.5px]">ask_and_media</span> uses code to
-        establish that the photos are geo-tagged Turkey while the campaign claims Gaza —
-        that part is a comparison. Whether that amounts to a material inconsistency is a
-        judgment, so it reaches the model as a fact rather than as a flag.
+        The label marks decision ownership, not workload.{" "}
+        <span className="mono text-[11.5px]">ask_and_media</span> uses Code to compare
+        image geo tags against the claimed location. The comparison is arithmetic;
+        classifying the result as an inconsistency is judgment, so it reaches Model as a
+        fact rather than a flag.
         <br />
         <br />
-        And the model step is bounded by code on <em>both</em> sides. It receives a fixed
-        evidence bundle, and afterwards its output has reserved flag types stripped, is
-        clamped if it contradicts itself, and is scored arithmetically. The model is
-        never the last word, even inside its own step.
+        Model output is bounded by Code on both sides. It receives a fixed evidence
+        bundle. Its output then has reserved flag types stripped, contradictory
+        recommendations clamped, and the score computed arithmetically.
       </p>
 
       <SectionLabel>The pipeline</SectionLabel>
@@ -211,12 +203,9 @@ export default function UnderTheHoodPage() {
         ))}
       </div>
       <p className="text-muted mb-8 max-w-[660px] text-[12.5px] leading-relaxed">
-        The model never emits the risk score. {data.scoring} Same flags in, same score
-        out — so the number is auditable rather than plausible. Three flag types
-        (unverified organisation, duplicate content, high ask) are reserved to the
-        deterministic layer and discarded if the model emits them: it was once observed
-        raising “high ask” for an ask at 1.09× the median that the arithmetic had
-        correctly declined to raise.
+        Model does not produce the risk score. {data.scoring} The same flags always
+        produce the same score. Three flag types — unverified organisation, duplicate
+        content, high ask — are reserved to Code and discarded if Model emits them.
       </p>
 
       <div className="mb-3 flex items-baseline justify-between">
@@ -232,7 +221,7 @@ export default function UnderTheHoodPage() {
         ) : (
           <span
             className="text-muted mb-3 text-[12.5px]"
-            title="Refreshing limits spends tokens, so it is reserved for signed-in reviewers."
+            title="Refreshing limits spends tokens. Signed-in reviewers only."
           >
             cached snapshot
           </span>
@@ -313,12 +302,11 @@ export default function UnderTheHoodPage() {
       </div>
 
       <p className="text-muted mb-8 max-w-[660px] text-[12.5px] leading-relaxed">
-        Models are tried in order; when one&apos;s daily quota runs out the next takes
-        over mid-run. Groq publishes remaining <em>per-minute</em> capacity on every
-        response, but there is no endpoint and no header for the <em>per-day</em> quota
-        — that number appears only inside the text of the 429 that announces you have
-        hit it. So the daily bar stays empty until a model has actually been exhausted,
-        and showing an estimate there instead would be inventing data.
+        Models are tried in order. When one model&apos;s daily quota is exhausted, the
+        next takes over mid-run. Groq returns remaining per-minute capacity on every
+        response. Per-day usage has no endpoint and no header — it appears only in the
+        429 that reports it — so the daily bar fills in only after a model has been
+        exhausted.
       </p>
 
       <SectionLabel>Evidence sources</SectionLabel>
@@ -326,7 +314,7 @@ export default function UnderTheHoodPage() {
         <Row
           label="Organisation registry"
           value={data.registries.map((r) => r.name).join(", ") || "mock only"}
-          note="ProPublica's Nonprofit Explorer is live and keyless for US organisations. No live register covers most of the 130+ countries this platform serves — that is missing public infrastructure, not a shortcut, and the bundle says which source answered."
+          note="ProPublica Nonprofit Explorer. Live, keyless, US organisations only. No live register covers most of the 130+ countries on this platform. The evidence bundle records which source answered."
           real
         />
         <Row
@@ -335,16 +323,16 @@ export default function UnderTheHoodPage() {
           note={
             data.search.live
               ? "Live search API."
-              : "Canned results keyed by organiser name. A real Tavily adapter implementing the same interface is written and activates when tavily_api_key is set."
+              : "Canned results keyed by organiser name. A Tavily adapter implementing the same interface activates when tavily_api_key is set."
           }
           real={data.search.live}
         />
         <Row
           label="Duplicate detection"
           value="text real, images mocked"
-          note="Body similarity is genuinely computed. Image matching uses pre-seeded fingerprints standing in for a perceptual hash — there is no vision model here."
+          note="Body text similarity is computed. Image matching uses pre-seeded fingerprints in place of a perceptual hash. No vision model."
         />
-        <Row label="Campaigns & past campaigns" value="mock dataset" note="14 fixtures with known expected outcomes, which the eval suite reads ground truth from." />
+        <Row label="Campaigns & past campaigns" value="mock dataset" note="14 fixtures with known expected outcomes. The eval suite reads ground truth from these." />
         <Row label="Decision log" value={data.database} real />
       </div>
 
@@ -362,8 +350,7 @@ export default function UnderTheHoodPage() {
       </div>
 
       <p className="mono text-muted text-[11px]">
-        captured {data.captured_at} · counters are per server process and reset on
-        restart
+        captured {data.captured_at} · counters are per server process, reset on restart
       </p>
     </div>
   );
