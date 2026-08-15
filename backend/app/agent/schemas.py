@@ -36,9 +36,21 @@ class Severity(str, Enum):
 
 
 class Source(str, Enum):
+    """Must stay in lockstep with the section headers in the evidence bundle.
+
+    The original brief listed four sources, but the pipeline actually gathers six
+    kinds of evidence, and the bundle labels them accordingly. The model quite
+    reasonably cited `media_metadata` — the header it read the evidence under — and
+    the request was rejected because the enum did not contain it. The bundle was
+    advertising sources the schema forbade; `test_bundle_sources_are_valid` now
+    fails if the two ever drift apart again.
+    """
+
     campaign_text = "campaign_text"
     org_registry = "org_registry"
     duplicate_check = "duplicate_check"
+    platform_stats = "platform_stats"
+    media_metadata = "media_metadata"
     web_search = "web_search"
 
 

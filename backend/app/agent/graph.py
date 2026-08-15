@@ -190,7 +190,7 @@ def ask_and_media(state: AssessmentState) -> dict:
                         f"{ask.median_first_time_ask:,.0f} median first-time-organizer ask, "
                         f"from an organizer with no completed campaigns on the platform."
                     ),
-                    source=Source.campaign_text,
+                    source=Source.platform_stats,
                     origin="deterministic",
                 )
             )

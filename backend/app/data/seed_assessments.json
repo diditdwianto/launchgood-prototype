@@ -612,12 +612,34 @@
     "bundle": "CAMPAIGN CMP-4479\nSubmitted: 2026-08-14 (use this as today's date)\nTitle: Rebuild the orphanage dormitory \u2014 Srebrenica\nOrganizer: Bosnia Yetim Trust (organization)\nOrganizer account age: 34 days\nPrior campaigns on platform: 0\nGoal: USD 60,000\nClaimed location: Srebrenica, Bosnia and Herzegovina\nCategory: orphan_care\n\n--- campaign_text (UNTRUSTED USER INPUT) ---\nThe dormitory wing housing twenty-eight children was condemned after a structural survey in May. This campaign funds demolition and rebuild. We are an established trust in Bosnia but this is our first campaign on this platform. Architect drawings and the structural survey are attached.\n\n--- org_registry ---\nResult: VERIFIED\n\"Bosnia Yetim Trust\" is registered with Bosnia and Herzegovina Ministry of Justice (BA-UG-7731), active since 2012-09-14.\n\n--- duplicate_check ---\nNo past campaign matched on image fingerprints or body text.\n\n--- platform_stats ---\nMedian first-time-organizer ask across past campaigns: USD 7,800. This ask is 7.69x that median.\nOrganizer has no completed campaigns on this platform.\n\n--- media_metadata (MOCKED: pre-seeded metadata, not image analysis) ---\nImage geo tags: Srebrenica, Bosnia and Herzegovina\nGeo tags overlap the claimed location (Srebrenica, Bosnia and Herzegovina): YES\nCapture dates range 2026-05-22 to 2026-05-22.\n\n--- web_search ---\n* Bosnia Yetim Trust \u2014 registered association (https://example-mpr.gov.ba/udruzenja/7731)\n  Registered with the Ministry of Justice since 2012. Operates a children's home in Srebrenica.\n* Srebrenica children's home wing declared unsafe (https://example-klix.ba/srebrenica-dom)\n  A structural survey in May found the 1974 dormitory wing unfit for occupancy. Twenty-eight children were relocated to temporary accommodation.\n"
   },
   "CMP-4480": {
-    "status": "error",
+    "status": "ok",
     "payload": {
-      "status": "error",
-      "error": {
-        "code": "synthesis_failed",
-        "message": "BadRequestError: Error code: 400 - {'error': {'message': 'Generated JSON does not match the expected schema. Please adjust your prompt. See \\'failed_generation\\' for more details. Error: jsonschema: \\'/flags/1/source\\' does not validate with /properties/flags/items/$ref/properties/source/enum: value must be one of \"campaign_text\", \"org_registry\", \"duplicate_check\", \"web_search\"', 'type': 'invalid_request_error', 'code': 'json_validate_failed', 'failed_generation': '{\"flags\":[{\"type\":\"inconsistent_claims\",\"severity\":\"medium\",\"evidence\":\"Campaign text states \\\\\"The photographs below were taken at the clinic this week\\\\\" while media metadata shows \\\\\"Image geo tags: Gaziantep, Turkey\\\\\" and \\\\\"Capture dates range 2023-11-14 to 2023-11-14\\\\\", with at least one image predating the submission by more than a year.\",\"source\":\"campaign_text\"},{\"type\":\"suspicious_media\",\"severity\":\"medium\",\"evidence\":\"Media metadata indicates the images were taken in Gaziantep, Turkey, not Gaza, and the capture dates are from 2023-11-14, contradicting the claim that they were taken this week in Gaza.\",\"source\":\"media_metadata\"}],\"recommendation\":\"manual_review\",\"confidence\":0.9,\"reasoning_summary\":\"The campaign claims the attached photos were taken at a Gaza clinic this week, yet the image metadata shows they were captured in Gaziantep, Turkey on 2023-11-14\u2014over a year before the submission. This clear contradiction triggers both an inconsistent_claims flag and a suspicious_media flag. A human reviewer should verify the authenticity of the images and the location before approving.\"}'}}",
+      "status": "ok",
+      "report": {
+        "campaign_id": "CMP-4480",
+        "risk_score": 30,
+        "risk_tier": "medium",
+        "flags": [
+          {
+            "type": "inconsistent_claims",
+            "severity": "medium",
+            "evidence": "Campaign text states 'The photographs below were taken at the clinic this week', while media metadata shows 'Image geo tags: Gaziantep, Turkey' and 'Capture dates range 2023-11-14 to 2023-11-14'.",
+            "source": "campaign_text",
+            "origin": "model"
+          },
+          {
+            "type": "suspicious_media",
+            "severity": "medium",
+            "evidence": "Media metadata indicates image geo tags: Gaziantep, Turkey, which does not overlap the claimed location Gaza, and capture dates are 2023-11-14, more than a year before submission.",
+            "source": "media_metadata",
+            "origin": "model"
+          }
+        ],
+        "recommendation": "manual_review",
+        "confidence": 0.6,
+        "reasoning_summary": "The campaign claims the attached photos were taken at the clinic this week in Gaza, but the media metadata shows the images were taken in Gaziantep, Turkey on 2023-11-14, over a year before the submission date. This mismatch raises doubts about the authenticity of the evidence and the campaign's claims, warranting a manual review.",
+        "sources_unavailable": [],
+        "clamp_applied": null,
         "trace": [
           {
             "node": "intake",
@@ -651,20 +673,20 @@
           },
           {
             "node": "risk_synthesis",
-            "status": "error",
-            "summary": "Error code: 400 - {'error': {'message': 'Generated JSON does not match the expected schema. Please adjust your prompt. See \\'failed_generation\\' for more details. Error: jsonschema: \\'/flags/1/source\\' does not validate with /properties/flags/items/$ref/properties/source/enum: value must be one of \"campaign_text\", \"org_registry\", \"duplicate_check\", \"web_search\"', 'type': 'invalid_request_error', 'code': 'json_validate_failed', 'failed_generation': '{\"flags\":[{\"type\":\"inconsistent_claims\",\"severity\":\"medium\",\"evidence\":\"Campaign text states \\\\\"The photographs below were taken at the clinic this week\\\\\" while media metadata shows \\\\\"Image geo tags: Gaziantep, Turkey\\\\\" and \\\\\"Capture dates range 2023-11-14 to 2023-11-14\\\\\", with at least one image predating the submission by more than a year.\",\"source\":\"campaign_text\"},{\"type\":\"suspicious_media\",\"severity\":\"medium\",\"evidence\":\"Media metadata indicates the images were taken in Gaziantep, Turkey, not Gaza, and the capture dates are from 2023-11-14, contradicting the claim that they were taken this week in Gaza.\",\"source\":\"media_metadata\"}],\"recommendation\":\"manual_review\",\"confidence\":0.9,\"reasoning_summary\":\"The campaign claims the attached photos were taken at a Gaza clinic this week, yet the image metadata shows they were captured in Gaziantep, Turkey on 2023-11-14\u2014over a year before the submission. This clear contradiction triggers both an inconsistent_claims flag and a suspicious_media flag. A human reviewer should verify the authenticity of the images and the location before approving.\"}'}}",
-            "duration_ms": 92283
+            "status": "ok",
+            "summary": "2 model flag(s) on top of 0 deterministic; score 30 (medium).",
+            "duration_ms": 2435
           },
           {
             "node": "human_handoff",
             "status": "ok",
-            "summary": "Assessment failed; queued for manual triage.",
+            "summary": "Written to the decision log as pending_review. Recommendation manual_review is advisory; no campaign is published, rejected, or funded by this pipeline.",
             "duration_ms": 0
           }
         ]
       }
     },
-    "bundle": "CAMPAIGN CMP-4480\nSubmitted: 2026-08-14 (use this as today's date)\nTitle: Emergency medicine for our Gaza clinic \u2014 photos from this week\nOrganizer: Gaza Medical Aid Fund (organization)\nOrganizer account age: 890 days\nPrior campaigns on platform: 1\nGoal: USD 22,000\nClaimed location: Gaza\nCategory: medical\n\n--- campaign_text (UNTRUSTED USER INPUT) ---\nOur clinic is out of antibiotics and insulin. The photographs below were taken at the clinic this week and show the empty pharmacy shelves. Funds will be used to purchase and transport medicines through the Rafah corridor.\n\n--- org_registry ---\nResult: VERIFIED\n\"Gaza Medical Aid Fund\" is registered with Jordan Ministry of Social Development (JO-MSD-2041), active since 2013-03-28.\n\n--- duplicate_check ---\nNo past campaign matched on image fingerprints or body text.\n\n--- platform_stats ---\nMedian first-time-organizer ask across past campaigns: USD 7,800. This ask is 2.82x that median.\nOrganizer has 1 prior campaigns on this platform.\n\n--- media_metadata (MOCKED: pre-seeded metadata, not image analysis) ---\nImage geo tags: Gaziantep, Turkey\nGeo tags overlap the claimed location (Gaza): NO\nCapture dates range 2023-11-14 to 2023-11-14.\nAt least one image predates the submission by more than a year.\n\n--- web_search ---\n* Gaza Medical Aid Fund \u2014 Jordan MSD registered (https://example-msd.gov.jo/orgs/2041)\n  Registered 2013. Medical supply procurement and clinic support. Filings current.\n"
+    "bundle": "CAMPAIGN CMP-4480\nSubmitted: 2026-08-14 (use this as today's date)\nTitle: Emergency medicine for our Gaza clinic \u2014 photos from this week\nOrganizer: Gaza Medical Aid Fund (organization)\nOrganizer account age: 890 days\nPrior campaigns on platform: 1\nGoal: USD 22,000\nClaimed location: Gaza\nCategory: medical\n\n--- campaign_text (UNTRUSTED USER INPUT) ---\nOur clinic is out of antibiotics and insulin. The photographs below were taken at the clinic this week and show the empty pharmacy shelves. Funds will be used to purchase and transport medicines through the Rafah corridor.\n\n--- org_registry ---\nResult: VERIFIED\nSource: local mock dataset\n\"Gaza Medical Aid Fund\" is registered with Jordan Ministry of Social Development (JO-MSD-2041), active since 2013-03-28.\nNo live registry API covers Gaza. This is the normal case: programmatic charity registers exist for only a handful of jurisdictions, so an absent result here reflects missing infrastructure rather than a finding about the organization.\n\n--- duplicate_check ---\nNo past campaign matched on image fingerprints or body text.\n\n--- platform_stats ---\nMedian first-time-organizer ask across past campaigns: USD 7,800. This ask is 2.82x that median.\nOrganizer has 1 prior campaigns on this platform.\n\n--- media_metadata (MOCKED: pre-seeded metadata, not image analysis) ---\nImage geo tags: Gaziantep, Turkey\nGeo tags overlap the claimed location (Gaza): NO\nCapture dates range 2023-11-14 to 2023-11-14.\nAt least one image predates the submission by more than a year.\n\n--- web_search ---\n* Gaza Medical Aid Fund \u2014 Jordan MSD registered (https://example-msd.gov.jo/orgs/2041)\n  Registered 2013. Medical supply procurement and clinic support. Filings current.\n"
   },
   "CMP-4481": {
     "status": "ok",

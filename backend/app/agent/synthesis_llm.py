@@ -285,6 +285,25 @@ def _call_one(model: str, messages: list[dict]) -> str:
             delay = _retry_delay(exc, attempt)
             if delay is None or attempt == MAX_TRANSIENT_RETRIES:
                 raise
+
+            # Feed a schema rejection back into the conversation rather than resending
+            # an identical prompt. A blind retry only helps when the failure is a bad
+            # sample; when the prompt asks for something the schema cannot express, it
+            # fails the same way every time — which is how one campaign burned fifteen
+            # attempts looking like flakiness instead of a contract bug.
+            if _error_code(exc) in SCHEMA_FAILURE_CODES and attempt == 0:
+                messages = messages + [
+                    {
+                        "role": "user",
+                        "content": (
+                            "Your previous response was rejected by schema validation:\n"
+                            f"{str(exc)[:600]}\n\n"
+                            "Fix only the structure. Use exactly the enum values the "
+                            "schema permits and do not change your findings."
+                        ),
+                    }
+                ]
+
             time.sleep(delay)
             continue
 

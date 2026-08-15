@@ -60,7 +60,8 @@ What is left for the model is the part no rules engine can do — and it is the 
 | The model invents a flag | Reserved types are stripped; flags citing a source that returned nothing are dropped. |
 | The model contradicts itself | `approve` alongside a high-severity flag is clamped to `manual_review`, and the override is logged and shown in the UI. |
 | Synthesis fails entirely | A typed error envelope, rendered as "needs manual triage." The campaign sorts *above* scored ones — a submission nobody could assess needs a human sooner than one scored low. |
-| Groq rate-limits | Retried honouring `retry-after`. Distinguished from a malformed request, which is never retried. |
+| Groq rate-limits | Retried honouring `retry-after`. Distinguished from a malformed request, which is never retried, and from an exhausted daily quota, which advances the model chain. |
+| The model cites a source the schema forbids | Fixed at the root: the bundle's section headers and the `Source` enum are one contract, and a test fails if they drift. A schema rejection is also fed back into the conversation rather than blind-retried. |
 | The campaign text tries to instruct the model | Treated as untrusted input, ignored, and recorded as a high-severity flag. Test case `CMP-4481`. |
 
 One honest characteristic: **model-authored flags vary between runs, deterministic ones do
@@ -84,16 +85,17 @@ Current state:
 DETERMINISTIC   13/14 cases pass          (14/14 on gpt-oss-120b)
   clean               4/4  (0 false positives)
   ambiguous           2/3
-LLM-AS-JUDGE    16/17 flags judged supported (94%)
-SUMMARY AUDIT   2/3 ambiguous-case summaries explain their flags rather than naming them
+LLM-AS-JUDGE    16/16 flags judged supported (100%)
+SUMMARY AUDIT   3/3 ambiguous-case summaries explain their flags rather than naming them
 CALIBRATION     2/2 planted fabrications caught
 ```
 
 **These numbers are model-dependent, and that is the point of having them.** The suite
-scored 14/14 on `gpt-oss-120b` and 13/14 after dropping to `gpt-oss-20b`; the remaining
-failure is `CMP-4476`, where the smaller model stops noticing the unverifiable
-affiliation claim. Moving between models without an eval suite would have made that
-invisible.
+scored 14/14 on `gpt-oss-120b` and 13/14 after dropping to `gpt-oss-20b`. The remaining
+failure is `CMP-4476`, and it is a measured capability gap rather than a guess: running
+that one campaign through both models, 20b raises no model-authored flag while 120b
+raises the unverifiable-affiliation concern at medium severity. Same prompt, same
+evidence. Swapping models without an eval suite would have made that silent.
 
 Two regressions the swap exposed were fixed properly rather than absorbed:
 
