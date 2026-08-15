@@ -105,7 +105,7 @@ app.add_middleware(
 # Everything under /api is authenticated unless listed here. An allowlist rather than
 # per-route dependencies so that adding an endpoint cannot accidentally add an
 # unprotected one — the failure mode of forgetting is a locked door, not an open one.
-PUBLIC_PATHS = {"/api/health", "/api/auth/login"}
+PUBLIC_PATHS = {"/api/health", "/api/auth/login", "/api/telemetry"}
 
 
 @app.middleware("http")
@@ -326,16 +326,23 @@ def assess_streaming(campaign_id: str):
 
 
 @app.get("/api/telemetry")
-def telemetry(probe: bool = False) -> dict:
-    """What this console is actually running on.
+def telemetry(request: Request, probe: bool = False) -> dict:
+    """What this console is actually running on. Readable without signing in, so the
+    system can be inspected without being handed the keys to it.
 
-    `probe=1` spends a handful of tokens per model to refresh rate-limit headers,
-    because Groq only discloses them on a response. Off by default so opening the
-    page does not quietly consume the quota it is reporting on.
+    Probing is the exception. Groq only discloses limits on a response, so refreshing
+    them spends tokens — an anonymous endpoint that did that on request would be a
+    quota drain with a button on it. Anonymous callers get the cached snapshot.
     """
     from .agent import registries, synthesis_llm
 
-    if probe:
+    header = request.headers.get("authorization", "")
+    signed_in = bool(
+        header.lower().startswith("bearer ")
+        and auth.read_token(header[7:].strip())
+    )
+
+    if probe and signed_in:
         synthesis_llm.probe_limits()
 
     data = synthesis_llm.telemetry()
@@ -347,7 +354,11 @@ def telemetry(probe: bool = False) -> dict:
         {"name": p.name, "covers_example": "United States" if p.name == "propublica" else "United Kingdom"}
         for p in registries.live_providers()
     ]
-    data["database"] = db.backend()
+    # The backend string carries host, port and database name. Fine for a signed-in
+    # reviewer, needless exposure to an anonymous one.
+    data["database"] = db.backend() if signed_in else "postgres"
+    data["signed_in"] = signed_in
+    data["probe_available"] = signed_in
     data["scoring"] = scoring.explain()
     data["captured_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return data

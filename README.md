@@ -236,11 +236,14 @@ Two things worth doing on camera:
 - Submit the same organiser with a non-US location. The registry step falls back to
   the local dataset and says so, because no live register covers that country.
 
-**Under the hood** (nav bar) explains the pipeline in plain terms and reports the
+**Under the hood** (nav bar) is readable **without signing in**, so the design can be
+inspected without being handed the keys to the console. It explains the pipeline in plain terms and reports the
 model layer live: the fallback chain, per-model pricing, remaining per-minute tokens,
 token spend this process, and which evidence sources are real versus mocked.
-"Check live limits" refreshes the rate-limit headers — off by default, so opening the
-page does not quietly consume the quota it reports on.
+"Check live limits" refreshes the rate-limit headers, and is restricted to signed-in
+reviewers: refreshing spends tokens, so an anonymous button that did it would be a
+quota drain with a UI. Anonymous visitors get the cached snapshot, and the database
+host is redacted for them.
 
 **Sign in** is required — the console approves and rejects live fundraising campaigns,
 and once a form triggers model calls an open endpoint is also someone else's bill.

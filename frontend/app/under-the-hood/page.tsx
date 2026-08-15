@@ -97,6 +97,15 @@ export default function UnderTheHoodPage() {
         used — it is <em>where the line sits</em> between those three.
       </p>
 
+      {!data.signed_in ? (
+        <p className="bg-panel border-brand/40 text-muted mb-8 max-w-[660px] rounded-lg border border-l-[3px] px-4 py-3 text-[13px] leading-relaxed">
+          You are reading this signed out, which is intentional — the design should be
+          inspectable without an account. The reviewer console itself needs one, because
+          it approves and rejects live fundraising campaigns and its submit form spends
+          real model tokens.
+        </p>
+      ) : null}
+
       <SectionLabel>The pipeline</SectionLabel>
       <ol className="bg-panel border-line mb-8 rounded-lg border">
         {PIPELINE.map((step, i) => (
@@ -150,13 +159,22 @@ export default function UnderTheHoodPage() {
 
       <div className="mb-3 flex items-baseline justify-between">
         <SectionLabel>Model layer · {data.provider}</SectionLabel>
-        <button
-          onClick={() => load(true)}
-          disabled={probing}
-          className="text-muted hover:text-ink mb-3 text-[12.5px] underline underline-offset-4 disabled:opacity-40"
-        >
-          {probing ? "Checking…" : "Check live limits"}
-        </button>
+        {data.probe_available ? (
+          <button
+            onClick={() => load(true)}
+            disabled={probing}
+            className="text-muted hover:text-ink mb-3 text-[12.5px] underline underline-offset-4 disabled:opacity-40"
+          >
+            {probing ? "Checking…" : "Check live limits"}
+          </button>
+        ) : (
+          <span
+            className="text-muted mb-3 text-[12.5px]"
+            title="Refreshing limits spends tokens, so it is reserved for signed-in reviewers."
+          >
+            cached snapshot
+          </span>
+        )}
       </div>
 
       <div className="mb-3 space-y-2.5">
