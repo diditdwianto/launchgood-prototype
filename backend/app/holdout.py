@@ -32,8 +32,21 @@ def holdout_pct() -> int:
         return DEFAULT_PCT
 
 
-def is_assisted(campaign_id: str) -> bool:
-    """False when this campaign is in the unassisted holdout."""
+def is_assisted(campaign_id: str, origin: str | None = None) -> bool:
+    """False when this campaign is in the unassisted holdout.
+
+    Fixtures are never held out. A decision on a fixture is someone clicking through a
+    walkthrough, not a reviewer judging real work, so withholding the recommendation
+    there manufactures a "clean" label that is worth less than no label at all. The
+    holdout only earns its cost where genuine labels are produced: campaigns submitted
+    through the console.
+
+    This is the same line already drawn for live web search — fixtures are test data,
+    submissions are real — rather than a separate exception.
+    """
+    if origin != "submitted":
+        return True
+
     pct = holdout_pct()
     if pct <= 0:
         return True

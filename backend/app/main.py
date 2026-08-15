@@ -185,7 +185,7 @@ def queue() -> dict:
         if campaign is None:
             continue
         payload = record["payload"]
-        assisted = holdout.is_assisted(campaign_id)
+        assisted = holdout.is_assisted(campaign_id, campaign.get("origin"))
         if not assisted:
             payload = holdout.strip_model_output(payload)
         report = payload.get("report") or {}
@@ -227,7 +227,7 @@ def campaign_detail(campaign_id: str) -> dict:
     if campaign is None or record is None:
         raise HTTPException(status_code=404, detail="campaign not found")
 
-    assisted = holdout.is_assisted(campaign_id)
+    assisted = holdout.is_assisted(campaign_id, campaign.get("origin"))
     payload = record["payload"] if assisted else holdout.strip_model_output(record["payload"])
 
     return {
@@ -271,7 +271,9 @@ def decide(
         body.decision,
         body.reviewer_note,
         username,
-        recommendation_visible=holdout.is_assisted(campaign_id),
+        recommendation_visible=holdout.is_assisted(
+            campaign_id, (find_campaign(campaign_id) or {}).get("origin")
+        ),
     )
     return {"logged": entry.model_dump(mode="json")}
 

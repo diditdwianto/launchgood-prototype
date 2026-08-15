@@ -122,11 +122,19 @@ def migrate() -> list[str]:
 def init(reset: bool = False) -> None:
     migrate()
     if reset:
-        # Assessments are a cache, rebuilt from the seed on every boot. Decisions are
-        # human work and are never dropped — persisting them is the entire reason this
-        # runs on Postgres.
+        # Fixture assessments are a cache, rebuilt from the committed seed on every
+        # boot. Assessments for SUBMITTED campaigns are not — there is no seed to
+        # rebuild them from, so truncating the whole table meant every campaign a
+        # reviewer submitted vanished from the queue on the next restart, while its
+        # row sat orphaned in submitted_campaigns.
+        #
+        # Decisions are never dropped at all; persisting them is why this runs on
+        # Postgres.
         with connect() as conn:
-            conn.execute("TRUNCATE TABLE assessments")
+            conn.execute(
+                "DELETE FROM assessments WHERE campaign_id NOT IN"
+                " (SELECT campaign_id FROM submitted_campaigns)"
+            )
 
 
 # ------------------------------------------------------------------ assessments
