@@ -74,6 +74,11 @@ export default function ReviewPage() {
   if (!data) return <Empty title="Loading assessment…" />;
 
   const { campaign, assessment } = data;
+  // Every escalation, oldest first. Showing only the latest would hide the note from
+  // a first handoff whenever a campaign is passed on more than once.
+  const escalations = [...data.history]
+    .reverse()
+    .filter((h) => h.human_decision === "escalate");
 
   return (
     <div className="mx-auto max-w-[820px] px-10 py-7">
@@ -126,6 +131,34 @@ export default function ReviewPage() {
         {campaign.organizer_type}) · goal {usd(campaign.goal_usd)} ·{" "}
         {campaign.claimed_location}
       </p>
+
+      {data.escalated ? (
+        <div className="border-medium bg-medium-tint mb-6 rounded-lg border-l-[3px] px-4.5 py-4">
+          <p className="text-medium mb-1.5 text-sm font-semibold">
+            Handed to you — awaiting a second reviewer
+          </p>
+          {escalations.map((h, i) => (
+            <p key={i} className="mb-1.5 text-[13.5px] leading-relaxed">
+              <span className="mono text-muted text-[12px]">
+                {h.decided_by || "a reviewer"} · {h.decided_at.slice(0, 10)}
+              </span>
+              <br />
+              {h.reviewer_note ? (
+                <span>“{h.reviewer_note}”</span>
+              ) : (
+                <span className="text-muted italic">
+                  Passed on without a note — nothing recorded about why.
+                </span>
+              )}
+            </p>
+          ))}
+          <p className="text-muted mt-2.5 text-[12.5px] leading-relaxed">
+            Stays in the queue until someone approves or rejects it. Single-reviewer
+            prototype: there is one account, so nothing prevents the same person
+            deciding. In production this would route to a different one.
+          </p>
+        </div>
+      ) : null}
 
       {assessment.status === "error" ? (
         <div className="border-high bg-high-tint mb-6 rounded-lg border-l-[3px] px-4 py-4">
@@ -223,39 +256,31 @@ export default function ReviewPage() {
         </pre>
       ) : null}
 
-      {data.escalated ? (
-        <div className="border-medium bg-medium-tint mb-5 rounded-lg border-l-[3px] px-4 py-3.5">
-          <p className="text-medium mb-1 text-sm font-semibold">
-            Escalated — awaiting a second reviewer
-          </p>
-          <p className="text-[13px] leading-relaxed">
-            {data.history[0]?.decided_by
-              ? `${data.history[0].decided_by} passed this on`
-              : "A reviewer passed this on"}
-            {data.history[0]?.reviewer_note
-              ? `: “${data.history[0].reviewer_note}”`
-              : "."}{" "}
-            It stays in the queue until someone approves or rejects it.
-          </p>
-          <p className="text-muted mt-2 text-[12.5px]">
-            Single-reviewer prototype: there is one account, so nothing prevents the
-            same person deciding. In production this would route to a different one.
-          </p>
-        </div>
-      ) : null}
-
       {data.history.length > 0 ? (
-        <div className="border-line bg-panel mb-5 rounded-lg border px-4 py-3">
-          <div className="text-muted mb-2 text-[11px] font-semibold tracking-[0.06em] uppercase">
-            Decision history
+        <>
+          <SectionLabel>Decision history</SectionLabel>
+          <div className="bg-panel border-line mb-6 overflow-hidden rounded-lg border">
+            {data.history.map((h, i) => (
+              <div
+                key={i}
+                className="border-line border-b px-4 py-3 last:border-b-0"
+              >
+                <div className="mono text-muted text-[12px]">
+                  {h.decided_at} ·{" "}
+                  <span className="text-ink">{h.human_decision}</span>
+                  {h.decided_by ? ` by ${h.decided_by}` : ""} · {h.outcome}
+                </div>
+                {h.reviewer_note ? (
+                  <p className="mt-1 text-[13px] leading-relaxed italic">
+                    “{h.reviewer_note}”
+                  </p>
+                ) : (
+                  <p className="text-muted mt-1 text-[12.5px] italic">no note</p>
+                )}
+              </div>
+            ))}
           </div>
-          {data.history.map((h, i) => (
-            <div key={i} className="mono text-muted py-0.5 text-[12px]">
-              {h.decided_at} · <span className="text-ink">{h.human_decision}</span>
-              {h.decided_by ? ` by ${h.decided_by}` : ""} · {h.outcome}
-            </div>
-          ))}
-        </div>
+        </>
       ) : null}
 
       {data.decided ? (
