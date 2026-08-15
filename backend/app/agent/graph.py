@@ -205,8 +205,9 @@ def ask_and_media(state: AssessmentState) -> dict:
 
 def web_search(state: AssessmentState) -> dict:
     def run():
-        provider = tools.get_search_provider()
-        results = provider.search(state["campaign"]["organizer_name"])
+        campaign = state["campaign"]
+        provider = tools.search_provider_for(campaign)
+        results = provider.search(campaign["organizer_name"])
         return (
             {"search_results": results},
             f"{provider.name} provider returned {len(results)} result(s).",

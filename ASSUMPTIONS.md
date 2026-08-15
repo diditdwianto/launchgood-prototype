@@ -6,19 +6,27 @@ parts of the design would change.
 ## What is mocked
 
 - **All campaign, organizer, registry and past-campaign data is fabricated.** No real
-  LaunchGood system is touched, and no real organization or person is described. Names,
-  registration numbers and URLs are invented; the `example-*.org` domains in the search
-  fixtures are deliberately non-resolving.
+  LaunchGood system is touched. Names, registration numbers and URLs are invented, and
+  the `example-*.org` domains in the search fixtures are deliberately non-resolving.
+
+  One caveat found the hard way: invented charity names are not unique. Searching the
+  fixtures' organisers returns real organisations — "Alamgir Relief Trust" surfaces the
+  real Alamgir Welfare Trust, "Ummah Welfare Aid" surfaces Ummah Welfare Trust. **Live
+  web search is therefore restricted to campaigns submitted through the console; the
+  fixtures always use canned results.** Otherwise the demo would present a real
+  charity's web presence as evidence inside a fabricated fraud case, which is unfair to
+  that charity regardless of intent, and would also make the eval suite's expected
+  outcomes depend on live search results.
 - **Organization registry lookup** runs against a local 14-entry JSON file, not a real
   national registry API.
 - **Duplicate detection** does real text-similarity computation (`difflib`) on campaign
   bodies. Image matching is **not** real: each image carries a pre-seeded `fingerprint`
   string standing in for a perceptual hash. There is no vision model anywhere in this
   pipeline.
-- **Web search** returns canned results keyed by organizer name. A real Tavily adapter
-  implementing the same `SearchProvider` interface is written in `tools.py` and is
-  selected automatically if `tavily_api_key` is set — it is left unset so the demo is
-  deterministic and cannot fail live on a network call.
+- **Web search** is live via Tavily for submitted campaigns when `tavily_api_key` is
+  set, and canned for the fixtures (see above). Both implement the same
+  `SearchProvider` interface. A search failure is contained by the node and recorded in
+  `sources_unavailable` rather than being read as "nothing found".
 - **`inconsistent_claims` and `suspicious_media`** are detected from pre-seeded metadata
   (image geo tags, capture dates) compared against the campaign's own text. This is
   metadata comparison, not image forensics.

@@ -277,6 +277,9 @@ def submit_campaign(body: NewCampaign, username: str = Depends(auth.current_user
     campaign["campaign_id"] = db.next_campaign_id()
     campaign["submitted_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     campaign["images"] = []  # no upload path yet; media checks degrade honestly
+    # Marks this as a real submission rather than a fixture, which is what unlocks
+    # live web search — see tools.search_provider_for.
+    campaign["origin"] = "submitted"
     db.save_campaign(campaign, username)
     return {"campaign": campaign}
 
@@ -346,9 +349,12 @@ def telemetry(request: Request, probe: bool = False) -> dict:
         synthesis_llm.probe_limits()
 
     data = synthesis_llm.telemetry()
+    provider = tools.get_search_provider().name
     data["search"] = {
-        "provider": tools.get_search_provider().name,
-        "live": tools.get_search_provider().name != "mock",
+        "provider": f"{provider} (submitted campaigns) · mock (fixtures)"
+        if provider != "mock"
+        else "mock",
+        "live": provider != "mock",
     }
     data["registries"] = [
         {"name": p.name, "covers_example": "United States" if p.name == "propublica" else "United Kingdom"}

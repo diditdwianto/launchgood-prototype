@@ -322,7 +322,7 @@ export default function UnderTheHoodPage() {
           value={data.search.provider}
           note={
             data.search.live
-              ? "Live search API."
+              ? "Tavily runs on submitted campaigns. The 14 fixtures keep canned results: their organiser names are invented but every one collides with a real charity, so live search would attach a real organisation's web presence to a fabricated fraud case, and would break the expected outcomes the eval suite reads."
               : "Canned results keyed by organiser name. A Tavily adapter implementing the same interface activates when tavily_api_key is set."
           }
           real={data.search.live}

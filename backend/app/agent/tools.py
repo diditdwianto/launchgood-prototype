@@ -276,8 +276,8 @@ class TavilySearchProvider:
 
         resp = httpx.post(
             "https://api.tavily.com/search",
+            headers={"Authorization": f"Bearer {self.api_key}"},
             json={
-                "api_key": self.api_key,
                 "query": f"{query} charity registration legitimacy",
                 "max_results": 5,
             },
@@ -293,3 +293,22 @@ class TavilySearchProvider:
 def get_search_provider() -> SearchProvider:
     key = os.environ.get("tavily_api_key")
     return TavilySearchProvider(key) if key else MockSearchProvider()
+
+
+def search_provider_for(campaign: dict) -> SearchProvider:
+    """Live search for real submissions; canned results for the fixtures.
+
+    The fixtures use invented organisation names, and every one of them collides
+    with a real charity — "Alamgir Relief Trust" returns the real Alamgir Welfare
+    Trust, "Ummah Welfare Aid" returns Ummah Welfare Trust. Pointing live search at
+    them would do two bad things: pull nondeterministic real data into cases whose
+    expected outcomes the eval suite depends on, and attach a real organisation's
+    name and web presence to a fabricated fraud scenario.
+
+    The second is the reason this is a hard rule rather than a config option. A
+    fictional case is only fair to invent if it cannot be mistaken for an
+    accusation about someone real.
+    """
+    if campaign.get("origin") == "submitted":
+        return get_search_provider()
+    return MockSearchProvider()
