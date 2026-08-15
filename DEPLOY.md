@@ -27,12 +27,15 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
    | Key | Value |
    |---|---|
    | `groq_api_key` | your key |
-   | `groq_model` | `openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b` |
+   | `model_chain` | `openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b` |
+   | `nvidia_build_api_key` | *optional* — enables the NVIDIA tail of the chain |
 
-   The model value is a fallback chain, cheapest first. Each model has its own daily
-   token quota, so when one runs out the next takes over mid-run instead of the batch
-   failing. Only models verified to support strict `json_schema` are accepted; the app
-   refuses to start otherwise.
+   The model value is a fallback chain, fast first and durable last, spanning Groq and
+   NVIDIA. Each Groq model has its own daily token quota; when one runs out the next
+   takes over mid-run. The NVIDIA model at the end is limited per minute rather than per
+   day, so it does not run out — it is the reason a spent quota degrades the demo to
+   slow instead of breaking it. Only models verified to support strict `json_schema` are
+   accepted; the app refuses to start otherwise.
    | `cors_origins` | set **after** step 2, to the exact Vercel origin |
    | `database_url` | **required** — the Postgres URL; see step 1a |
    | `PYTHON_VERSION` | `3.13.3` |

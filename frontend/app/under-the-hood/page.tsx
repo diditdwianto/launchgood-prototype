@@ -259,9 +259,18 @@ export default function UnderTheHoodPage() {
                     quota spent
                   </span>
                 ) : null}
+                <span className="mono text-muted rounded border border-[var(--color-line)] px-1.5 py-0.5 text-[10px] tracking-wide uppercase">
+                  {m.provider}
+                </span>
+                {!m.configured ? (
+                  <span className="bg-medium-tint text-medium rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                    no key
+                  </span>
+                ) : null}
                 <span className="mono text-muted ml-auto text-[11px]">
-                  ${m.pricing.input_per_mtok}/M in · $
-                  {m.pricing.output_per_mtok}/M out
+                  {m.pricing
+                    ? `$${m.pricing.input_per_mtok}/M in · $${m.pricing.output_per_mtok}/M out`
+                    : "free tier"}
                 </span>
               </div>
 
@@ -287,9 +296,15 @@ export default function UnderTheHoodPage() {
                 caption={
                   perDay
                     ? `${(usedDay ?? 0).toLocaleString()} of ${perDay.toLocaleString()} used`
-                    : "not published by the API — see the note below"
+                    : m.provider === "nvidia"
+                      ? "no daily token cap — limited per minute"
+                      : "not published by the API — see the note below"
                 }
               />
+
+              {m.note ? (
+                <p className="text-muted mt-1.5 text-[11.5px] leading-relaxed">{m.note}</p>
+              ) : null}
 
               <p className="mono text-muted mt-2.5 text-[11px]">
                 this process: {m.usage.calls} call(s) ·{" "}
@@ -302,11 +317,17 @@ export default function UnderTheHoodPage() {
       </div>
 
       <p className="text-muted mb-8 max-w-[660px] text-[12.5px] leading-relaxed">
-        Models are tried in order. When one model&apos;s daily quota is exhausted, the
-        next takes over mid-run. Groq returns remaining per-minute capacity on every
-        response. Per-day usage has no endpoint and no header — it appears only in the
-        429 that reports it — so the daily bar fills in only after a model has been
-        exhausted.
+        Models are tried in order, fast first and durable last. The Groq models answer
+        in 1.5–3s but are capped at 200,000 tokens per model per day; the NVIDIA model
+        takes 19–33s and is limited per minute instead, so it does not run out. When a
+        daily quota is spent the chain moves on mid-run, and the system degrades to
+        slow rather than to broken.
+        <br />
+        <br />
+        Groq returns remaining per-minute capacity on every response. Per-day usage has
+        no endpoint and no header — it appears only in the 429 that reports it — so
+        that bar fills in only after a model has been exhausted. NVIDIA returns no
+        rate-limit headers at all, so its row stays empty by design.
       </p>
 
       <SectionLabel>Evidence sources</SectionLabel>

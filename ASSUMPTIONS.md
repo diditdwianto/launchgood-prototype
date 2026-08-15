@@ -33,7 +33,8 @@ parts of the design would change.
 
 ## Deviations from the original brief
 
-- **The brief specifies Anthropic Claude; this uses Groq with `openai/gpt-oss-20b`.**
+- **The brief specifies Anthropic Claude; this uses Groq with `openai/gpt-oss-20b`,
+  falling back to NVIDIA `nemotron-3-super-120b-a12b`.**
   The provider was swapped for credential availability. It was verified before any
   pipeline code was written that this model family honours `response_format: json_schema`
   with `strict: true`, which is what the structured-output requirement depends on.

@@ -362,6 +362,7 @@ def telemetry(request: Request, probe: bool = False) -> dict:
     ]
     # The backend string carries host, port and database name. Fine for a signed-in
     # reviewer, needless exposure to an anonymous one.
+    data["provider"] = " + ".join(data.pop("providers", []))
     data["database"] = db.backend() if signed_in else "postgres"
     data["signed_in"] = signed_in
     data["probe_available"] = signed_in

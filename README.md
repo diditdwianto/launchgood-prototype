@@ -180,8 +180,18 @@ tokens), roughly 2 seconds each.
 **Model fallback.** `groq_model` takes a comma-separated chain, cheapest-capable first:
 
 ```
-groq_model=openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b
+model_chain=openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b
 ```
+
+Ordered fast first, durable last, and it spans two providers. Groq and NVIDIA both
+expose OpenAI-compatible endpoints, so this is one client against two base URLs rather
+than two vendor SDKs.
+
+The three Groq models answer in 1.5–3s but are capped at **200,000 tokens per model per
+day**; once that is gone it is gone until tomorrow. The NVIDIA model is measured at
+**19–33s** warm and is limited **per minute** instead, so it does not run out. The
+system therefore degrades to slow rather than to broken — which is the right direction
+for a tool a reviewer is sitting in front of.
 
 Groq returns 429 both for "you are going too fast" and for "you are out of tokens for
 today", and only the message separates them. Backing off on the second wastes the entire
@@ -197,9 +207,12 @@ do not work, and each failure is different:
 
 | Model | Why it is not in the chain |
 |---|---|
-| `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` | Reject `json_schema` outright. |
-| `groq/compound` | Rejects `json_schema` — and its 429 names `gpt-oss-120b` as what it routes to, so it draws on the quota of the very model it would be backing up. |
-| `qwen/qwen3.6-27b` | Accepts the schema and works on short prompts, but returns an empty generation on the real bundle: a reasoning model that spends its budget before emitting JSON. Permitted, but not a default. |
+| Groq `llama-3.3-70b-versatile`, `llama-3.1-8b-instant` | Reject `json_schema` outright. |
+| Groq `groq/compound` | Rejects `json_schema` — and its 429 names `gpt-oss-120b` as what it routes to, so it draws on the quota of the very model it would be backing up. |
+| Groq `qwen/qwen3.6-27b` | Accepts the schema and works on short prompts, but returns an empty generation on the real bundle: a reasoning model that spends its budget before emitting JSON. Permitted, but not a default. |
+| NVIDIA `mistral-large-2-instruct`, `kimi-k2.6` | 404 on this tier. |
+| NVIDIA `llama-3.3-70b-instruct` | Exceeded 90s on every attempt. |
+| NVIDIA `meta/llama-3.1-8b-instruct` | The only fast NVIDIA option at 2.0s, but 8B, and it emitted flag types the prompt reserves to the deterministic layer. |
 
 A fallback that cannot satisfy the contract is an outage with extra steps, so
 misconfiguration fails loudly at startup rather than silently under load.

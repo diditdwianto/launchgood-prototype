@@ -1,4 +1,18 @@
-"""The one node where a model does the work a rules engine cannot."""
+"""The one node where a model does the work a rules engine cannot.
+
+Two providers, one client. Groq and NVIDIA both expose OpenAI-compatible endpoints,
+so this uses the `openai` SDK against two base URLs rather than carrying two vendor
+SDKs with two exception hierarchies.
+
+The chain is ordered fast-first, durable-last:
+
+    gpt-oss-20b → gpt-oss-120b → gpt-oss-safeguard-20b → nemotron-3-super-120b
+
+The first three are Groq: ~1.5-3s, but capped at 200k tokens per model per DAY, and
+once that is gone it is gone until tomorrow. The last is NVIDIA: measured at 19-33s
+warm, but limited per MINUTE rather than per day. So the system degrades to slow
+rather than to broken, which is the right direction for a reviewer-facing tool.
+"""
 
 from __future__ import annotations
 
@@ -7,8 +21,9 @@ import os
 import re
 import threading
 import time
+from dataclasses import dataclass
 
-from groq import Groq
+from openai import OpenAI
 from pydantic import ValidationError
 
 from .prompts import SYNTHESIS_SYSTEM
@@ -16,65 +31,112 @@ from .schemas import Flag, SynthesisDraft
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "openai/gpt-oss-20b"
 
-# Groq list pricing, USD per million tokens (input, output).
-PRICING: dict[str, tuple[float, float]] = {
-    "openai/gpt-oss-20b": (0.075, 0.30),
-    "openai/gpt-oss-120b": (0.15, 0.60),
-    "openai/gpt-oss-safeguard-20b": (0.075, 0.30),
-    "qwen/qwen3.6-27b": (0.60, 3.00),
+@dataclass(frozen=True)
+class Provider:
+    name: str
+    base_url: str
+    key_env: str
+
+
+PROVIDERS = {
+    "groq": Provider("groq", "https://api.groq.com/openai/v1", "groq_api_key"),
+    "nvidia": Provider(
+        "nvidia", "https://integrate.api.nvidia.com/v1", "nvidia_build_api_key"
+    ),
 }
 
-# Every entry verified by direct API call against the real evidence bundle on
-# 2026-08-14, not from documentation. The whole pipeline depends on strict structured
-# output, so a model that cannot produce it is not a fallback — it is an outage with
-# extra steps. The chain is validated up front so a misconfiguration fails loudly at
-# startup instead of silently at 3am.
+
+@dataclass(frozen=True)
+class ModelSpec:
+    provider: str
+    # USD per million tokens (input, output). None where the tier is free credits
+    # rather than metered — reporting $0.00000 would imply a measured cost.
+    price: tuple[float, float] | None
+    timeout: float
+    note: str = ""
+
+
+# Every entry verified by direct API call against the real evidence bundle and the
+# real SynthesisDraft schema. The pipeline depends on strict structured output, so a
+# model that cannot produce it is not a fallback — it is an outage with extra steps.
 #
 # Confirmed NOT usable, each by direct test:
-#   llama-3.3-70b-versatile, llama-3.1-8b-instant
-#       reject `json_schema` outright.
-#   groq/compound
-#       rejects `json_schema`, and its 429 names `openai/gpt-oss-120b` as the model it
-#       routes to — so it draws on that model's daily quota and cannot be a fallback
-#       for the very model it depends on.
-#   qwen/qwen3.6-27b
-#       accepts the schema and succeeds on short prompts, but returns an empty
-#       generation on the real system prompt plus bundle — it is a reasoning model and
-#       spends its budget before emitting JSON. Allowed, but a poor last resort; it is
-#       deliberately not in the default chain.
-SCHEMA_CAPABLE_MODELS = {
+#   Groq    llama-3.3-70b-versatile, llama-3.1-8b-instant — reject json_schema.
+#   Groq    groq/compound — rejects json_schema, and its 429 names gpt-oss-120b as
+#           what it routes to, so it shares the quota it would be backing up.
+#   Groq    qwen/qwen3.6-27b — accepts the schema, returns an empty generation on the
+#           real bundle. Reasoning model, spends its budget before emitting JSON.
+#   NVIDIA  mistral-large-2-instruct, kimi-k2.6 — 404 on this tier.
+#   NVIDIA  llama-3.3-70b-instruct — exceeded 90s on every attempt.
+MODELS: dict[str, ModelSpec] = {
+    "openai/gpt-oss-20b": ModelSpec("groq", (0.075, 0.30), 60.0),
+    "openai/gpt-oss-120b": ModelSpec("groq", (0.15, 0.60), 60.0),
+    "openai/gpt-oss-safeguard-20b": ModelSpec("groq", (0.075, 0.30), 60.0),
+    "qwen/qwen3.6-27b": ModelSpec(
+        "groq", (0.60, 3.00), 60.0, "unreliable on long prompts; not in the default chain"
+    ),
+    "nvidia/nemotron-3-super-120b-a12b": ModelSpec(
+        "nvidia", None, 150.0, "19-33s warm; per-minute limit, no daily token cap"
+    ),
+    "nvidia/nemotron-3.5-lightning-30b-a3b": ModelSpec("nvidia", None, 120.0, "~16s warm"),
+    "nvidia/nemotron-3-nano-30b-a3b": ModelSpec("nvidia", None, 120.0, "~15s warm"),
+    "meta/llama-3.1-8b-instruct": ModelSpec(
+        "nvidia", None, 60.0, "2s but 8B; weaker prompt adherence in testing"
+    ),
+}
+
+DEFAULT_CHAIN = [
     "openai/gpt-oss-20b",
     "openai/gpt-oss-120b",
     "openai/gpt-oss-safeguard-20b",
-    "qwen/qwen3.6-27b",
-}
+    "nvidia/nemotron-3-super-120b-a12b",
+]
+
+MAX_TRANSIENT_RETRIES = 4
+SCHEMA_REPAIR_ATTEMPTS = 1  # Capped deliberately. An unbounded repair loop against a
+# confidently-wrong model burns cost while hiding the prompt bug you need to see.
 
 
-# Daily token quotas are per-model, so a model that is exhausted is not a model that
-# is slow — no amount of backoff recovers it. `groq_model` accepts a comma-separated
-# chain; when one model's quota is gone the next one takes over mid-run rather than
-# the whole batch failing. Order it cheapest-capable first.
 def model_chain() -> list[str]:
-    raw = os.environ.get("groq_model", DEFAULT_MODEL)
-    chain = [m.strip() for m in raw.split(",") if m.strip()] or [DEFAULT_MODEL]
+    """Ordered list of models to try. `model_chain` env var overrides the default."""
+    raw = os.environ.get("model_chain") or os.environ.get("groq_model") or ""
+    chain = [m.strip() for m in raw.split(",") if m.strip()] or list(DEFAULT_CHAIN)
 
-    unusable = [m for m in chain if m not in SCHEMA_CAPABLE_MODELS]
-    if unusable:
+    unknown = [m for m in chain if m not in MODELS]
+    if unknown:
         raise ValueError(
-            f"groq_model contains models that cannot produce strict structured output: "
-            f"{', '.join(unusable)}. The risk report contract depends on it, so these "
+            f"model_chain contains models not verified for strict structured output: "
+            f"{', '.join(unknown)}. The risk report contract depends on it, so these "
             f"would fail every call rather than act as a fallback. "
-            f"Known-good: {', '.join(sorted(SCHEMA_CAPABLE_MODELS))}."
+            f"Known-good: {', '.join(sorted(MODELS))}."
+        )
+
+    missing_key = [m for m in chain if not os.environ.get(PROVIDERS[MODELS[m].provider].key_env)]
+    if missing_key:
+        logger.warning(
+            "no API key for %s; these will be skipped", ", ".join(missing_key)
         )
     return chain
 
 
+def usable_chain() -> list[str]:
+    """Chain minus models with no key configured and models already exhausted."""
+    return [
+        m
+        for m in model_chain()
+        if os.environ.get(PROVIDERS[MODELS[m].provider].key_env) and m not in _exhausted
+    ]
+
+
 def model_name() -> str:
-    """The model currently in use — the first in the chain that has not been exhausted."""
-    chain = model_chain()
-    return next((m for m in chain if m not in _exhausted), chain[-1])
+    """The model currently in use — first in the chain still available."""
+    usable = usable_chain()
+    return usable[0] if usable else model_chain()[-1]
+
+
+def provider_of(model: str) -> str:
+    return MODELS[model].provider if model in MODELS else "unknown"
 
 
 # Models whose quota ran out this process. Not retried again; the chain moves on.
@@ -84,9 +146,8 @@ _exhausted: set[str] = set()
 #
 # Groq exposes remaining per-MINUTE capacity on every response (x-ratelimit-*), but
 # publishes no endpoint and no header for the per-DAY token quota — that number
-# appears only inside the text of the 429 that announces you have hit it. So the
-# minute window can be watched proactively, and the daily one can only be recorded
-# after the fact. Both are captured here; neither is inferred.
+# appears only inside the text of the 429 that announces you have hit it. NVIDIA
+# returns no rate-limit headers at all, so its row stays empty by design.
 _limits: dict[str, dict] = {}
 
 _DAILY_QUOTA_RE = re.compile(
@@ -120,17 +181,11 @@ def rate_limits() -> dict[str, dict]:
     return {m: dict(v) for m, v in _limits.items()}
 
 
-MAX_TRANSIENT_RETRIES = 4
-SCHEMA_REPAIR_ATTEMPTS = 1  # Capped deliberately. An unbounded repair loop against a
-# confidently-wrong model burns cost while hiding the prompt bug you need to see.
-
-
 class Usage:
     """Token accounting, tracked per model.
 
-    Per-model rather than aggregate because the chain can shift mid-run: pricing
-    differs by an order of magnitude across it, so one blended figure would be wrong
-    for every model in it.
+    Per-model rather than aggregate because the chain spans two providers and an
+    order of magnitude in price; one blended figure would be wrong for every model.
     """
 
     def __init__(self) -> None:
@@ -150,11 +205,14 @@ class Usage:
 
     @property
     def usd(self) -> float:
+        """Metered spend only. Free-tier models contribute nothing, which is why the
+        figure is reported alongside a per-model breakdown rather than on its own."""
         total = 0.0
         for model, e in self.by_model.items():
-            # Unknown model: contribute 0 rather than inventing a rate. A cost figure
-            # you cannot source is worse than no cost figure.
-            price_in, price_out = PRICING.get(model, (0.0, 0.0))
+            spec = MODELS.get(model)
+            if spec is None or spec.price is None:
+                continue
+            price_in, price_out = spec.price
             total += (e["prompt"] * price_in + e["completion"] * price_out) / 1_000_000
         return total
 
@@ -172,21 +230,25 @@ class Usage:
 
 usage = Usage()
 
-_client: Groq | None = None
+_clients: dict[str, OpenAI] = {}
 
 
-def _get_client() -> Groq:
-    global _client
-    if _client is None:
-        _client = Groq(api_key=os.environ["groq_api_key"])
-    return _client
+def _client_for(model: str) -> OpenAI:
+    spec = MODELS[model]
+    provider = PROVIDERS[spec.provider]
+    if provider.name not in _clients:
+        _clients[provider.name] = OpenAI(
+            base_url=provider.base_url,
+            api_key=os.environ[provider.key_env],
+            max_retries=0,  # retries are handled here, with classification
+        )
+    return _clients[provider.name]
 
 
-# Groq's own error codes for "the model failed to satisfy the strict schema on this
-# sample". Matched on code rather than on the human-readable message, which is not
-# stable: gpt-oss-120b says "Generated JSON does not match the expected schema" and
-# gpt-oss-20b says "Failed to validate JSON", so a prose match silently stopped
-# retrying the moment the model was swapped.
+# Error codes meaning "the model failed to satisfy the strict schema on this sample".
+# Matched on code rather than message: gpt-oss-120b says "Generated JSON does not
+# match the expected schema" while gpt-oss-20b says "Failed to validate JSON", so a
+# prose match silently stopped retrying the moment the model was swapped.
 SCHEMA_FAILURE_CODES = {"json_validate_failed", "json_schema_validation_failed"}
 
 
@@ -202,10 +264,10 @@ def _error_code(exc: Exception) -> str | None:
 def _is_quota_exhausted(exc: Exception) -> bool:
     """A daily quota is not a pacing problem.
 
-    Groq returns 429 for both "you are going too fast" and "you are out of tokens for
-    today", and only the message separates them. Backing off on the second wastes the
-    whole retry budget on a call that cannot succeed until tomorrow, which is exactly
-    what makes it worth falling back to another model instead.
+    Groq returns 429 both for "you are going too fast" and "you are out of tokens for
+    today", and only the message separates them. NVIDIA's limit is per-minute, so its
+    429s are always transient and never land here — which is the whole reason it sits
+    last in the chain.
     """
     if getattr(exc, "status_code", None) != 429:
         return False
@@ -214,7 +276,6 @@ def _is_quota_exhausted(exc: Exception) -> bool:
     if "per day" in message or "tpd" in message or "rpd" in message:
         return True
 
-    # A retry-after measured in minutes is a quota in all but name.
     response = getattr(exc, "response", None)
     header = response.headers.get("retry-after") if response is not None else None
     try:
@@ -224,19 +285,12 @@ def _is_quota_exhausted(exc: Exception) -> bool:
 
 
 def _retry_delay(exc: Exception, attempt: int) -> float | None:
-    """None means do not retry.
-
-    Three upstream failures are worth distinguishing. A 429 is a pacing problem and
-    the server tells us how long to wait. A 400 whose code says the model could not
-    satisfy strict mode is sample-dependent — a fresh sample usually succeeds — so it
-    is retryable. Any other 400 is a bug in our request, and retrying it just burns
-    quota against a call that will never succeed.
-    """
+    """None means do not retry."""
     status = getattr(exc, "status_code", None)
 
     if status == 429:
-        wait = getattr(exc, "response", None)
-        header = wait.headers.get("retry-after") if wait is not None else None
+        response = getattr(exc, "response", None)
+        header = response.headers.get("retry-after") if response is not None else None
         try:
             return min(float(header), 30.0) if header else 2.0 * 2**attempt
         except (TypeError, ValueError):
@@ -255,16 +309,14 @@ def _retry_delay(exc: Exception, attempt: int) -> float | None:
 
 
 def _call_one(model: str, messages: list[dict]) -> str:
-    """Try a single model, with retries for genuinely transient failures.
-
-    Raises on quota exhaustion immediately rather than burning the retry budget.
-    """
+    """Try a single model, retrying only genuinely transient failures."""
     schema = SynthesisDraft.model_json_schema()
+    spec = MODELS[model]
 
     for attempt in range(MAX_TRANSIENT_RETRIES + 1):
         started = time.perf_counter()
         try:
-            raw = _get_client().chat.completions.with_raw_response.create(
+            raw = _client_for(model).chat.completions.with_raw_response.create(
                 model=model,
                 messages=messages,
                 response_format={
@@ -272,6 +324,7 @@ def _call_one(model: str, messages: list[dict]) -> str:
                     "json_schema": {"name": "risk_synthesis", "strict": True, "schema": schema},
                 },
                 temperature=0.2,
+                timeout=spec.timeout,
             )
             _record_headers(model, raw.headers)
             resp = raw.parse()
@@ -282,15 +335,15 @@ def _call_one(model: str, messages: list[dict]) -> str:
             if _is_quota_exhausted(exc):
                 _record_daily_quota(model, exc)
                 raise
+
             delay = _retry_delay(exc, attempt)
             if delay is None or attempt == MAX_TRANSIENT_RETRIES:
                 raise
 
-            # Feed a schema rejection back into the conversation rather than resending
-            # an identical prompt. A blind retry only helps when the failure is a bad
-            # sample; when the prompt asks for something the schema cannot express, it
-            # fails the same way every time — which is how one campaign burned fifteen
-            # attempts looking like flakiness instead of a contract bug.
+            # Feed a schema rejection back rather than resending an identical prompt.
+            # A blind retry only helps when the failure is a bad sample; when the
+            # prompt asks for something the schema cannot express it fails the same
+            # way every time.
             if _error_code(exc) in SCHEMA_FAILURE_CODES and attempt == 0:
                 messages = messages + [
                     {
@@ -319,18 +372,17 @@ def _call_one(model: str, messages: list[dict]) -> str:
 
 
 def _call(messages: list[dict]) -> str:
-    """Walk the model chain, moving on when a model's quota is gone.
+    """Walk the chain, moving on when a model's quota is gone.
 
-    Falling back is a real change in behaviour, not a transparent retry: a smaller
-    model produces different flags. It is logged and surfaced in /api/health so a
-    reviewer is never quietly reading output from a model they did not choose.
+    Falling back is a real change in behaviour, not a transparent retry: a different
+    model produces different flags, and the NVIDIA tail is an order of magnitude
+    slower. It is logged and surfaced in /api/health so nobody is quietly reading
+    output from a model they did not choose.
     """
-    chain = model_chain()
+    chain = usable_chain() or model_chain()[-1:]
     last: Exception | None = None
 
     for model in chain:
-        if model in _exhausted:
-            continue
         try:
             return _call_one(model, messages)
         except Exception as exc:  # noqa: BLE001
@@ -385,19 +437,25 @@ def probe_limits() -> None:
     """Refresh rate-limit headers for every model in the chain.
 
     Groq only reveals limits on a response, so knowing where a model stands costs a
-    request. This sends the smallest one possible — a single completion token, on the
-    order of ten tokens billed — purely to read the headers.
+    request. This sends the smallest one possible. Probing an exhausted model is worth
+    doing rather than skipping: the 429 is the only place the per-day quota is ever
+    stated, so a model that has run out is the one that will tell you its ceiling.
 
-    Probing an exhausted model is worth doing rather than skipping: the 429 is the
-    only place the per-day quota is ever stated, so a model that has run out is
-    precisely the one that will tell you its ceiling.
+    NVIDIA is skipped — it returns no rate-limit headers, so a probe would spend a
+    request and learn nothing.
     """
     for model in model_chain():
+        spec = MODELS[model]
+        if spec.provider != "groq":
+            continue
+        if not os.environ.get(PROVIDERS[spec.provider].key_env):
+            continue
         try:
-            raw = _get_client().chat.completions.with_raw_response.create(
+            raw = _client_for(model).chat.completions.with_raw_response.create(
                 model=model,
                 messages=[{"role": "user", "content": "ping"}],
                 max_completion_tokens=1,
+                timeout=20.0,
             )
             _record_headers(model, raw.headers)
         except Exception as exc:  # noqa: BLE001
@@ -412,34 +470,45 @@ def probe_limits() -> None:
 def telemetry() -> dict:
     """Everything the console knows about its own model layer."""
     chain = model_chain()
+    active = model_name()
     per_model = usage.by_model
 
     models = []
     for position, model in enumerate(chain, start=1):
+        spec = MODELS[model]
         spent = per_model.get(model, {"calls": 0, "prompt": 0, "completion": 0})
-        price_in, price_out = PRICING.get(model, (0.0, 0.0))
+        price = spec.price
+        cost = (
+            round(
+                (spent["prompt"] * price[0] + spent["completion"] * price[1]) / 1_000_000,
+                5,
+            )
+            if price
+            else 0.0
+        )
         models.append(
             {
                 "model": model,
+                "provider": spec.provider,
                 "position": position,
-                "active": model == model_name(),
+                "active": model == active,
                 "exhausted": model in _exhausted,
-                "pricing": {"input_per_mtok": price_in, "output_per_mtok": price_out},
+                "configured": bool(os.environ.get(PROVIDERS[spec.provider].key_env)),
+                "metered": price is not None,
+                "note": spec.note,
+                "pricing": (
+                    {"input_per_mtok": price[0], "output_per_mtok": price[1]}
+                    if price
+                    else None
+                ),
                 "limits": _limits.get(model, {}),
-                "usage": {
-                    **spent,
-                    "usd": round(
-                        (spent["prompt"] * price_in + spent["completion"] * price_out)
-                        / 1_000_000,
-                        5,
-                    ),
-                },
+                "usage": {**spent, "usd": cost},
             }
         )
 
     return {
-        "provider": "Groq",
+        "providers": sorted({MODELS[m].provider for m in chain}),
         "chain": models,
-        "schema_capable_models": sorted(SCHEMA_CAPABLE_MODELS),
+        "schema_capable_models": sorted(MODELS),
         "totals": usage.summary(),
     }
