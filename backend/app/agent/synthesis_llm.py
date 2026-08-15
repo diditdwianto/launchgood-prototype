@@ -344,6 +344,21 @@ def _call_one(model: str, messages: list[dict]) -> str:
             # A blind retry only helps when the failure is a bad sample; when the
             # prompt asks for something the schema cannot express it fails the same
             # way every time.
+            #
+            # Two different failures land here and need different words. CMP-4480
+            # used a source value the schema did not contain — a wrong-value error,
+            # "missing properties: 'recommendation', 'confidence', ...". CMP-4503 used
+            # only valid values but the model stopped generating right after the flags
+            # array, on an evidence-dense bundle about a real banned organization —
+            # not a refusal (finish_reason was "stop" and the flag it did write was
+            # substantive and well grounded), just an incomplete object. The original
+            # instruction ("use exactly the enum values the schema permits") did not
+            # address that case, so both are named explicitly here.
+            #
+            # Appended once, on the first such failure: `messages` is the list every
+            # subsequent attempt is called with, so the instruction is not lost after
+            # attempt 0 — it stays in the conversation for the rest of the retries.
+            # Re-appending it on every attempt would just stack up identical messages.
             if _error_code(exc) in SCHEMA_FAILURE_CODES and attempt == 0:
                 messages = messages + [
                     {
@@ -351,8 +366,13 @@ def _call_one(model: str, messages: list[dict]) -> str:
                         "content": (
                             "Your previous response was rejected by schema validation:\n"
                             f"{str(exc)[:600]}\n\n"
-                            "Fix only the structure. Use exactly the enum values the "
-                            "schema permits and do not change your findings."
+                            "Either a field used a value the schema does not permit, or "
+                            "the response stopped before the object was complete. Return "
+                            "the full JSON object with every required field present — "
+                            "flags, recommendation, confidence, and reasoning_summary — "
+                            "using only the enum values the schema allows. If your evidence "
+                            "text was very long, shorten it; do not let it crowd out the "
+                            "fields after it. Do not change your findings."
                         ),
                     }
                 ]

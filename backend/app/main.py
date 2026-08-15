@@ -94,13 +94,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Campaign Trust & Compliance Copilot", lifespan=lifespan)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o for o in os.environ.get("cors_origins", "*").split(",") if o],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 
 # Everything under /api is authenticated unless listed here. An allowlist rather than
 # per-route dependencies so that adding an endpoint cannot accidentally add an
@@ -128,6 +121,23 @@ async def require_auth(request: Request, call_next):
     if auth.read_token(token) is None:
         return JSONResponse({"detail": "not authenticated"}, status_code=401)
     return await call_next(request)
+
+
+# CORSMiddleware is added AFTER require_auth, not before — Starlette makes the
+# most-recently-added middleware the outermost layer, so this ordering is what makes
+# CORSMiddleware wrap require_auth rather than the reverse. That matters because
+# require_auth returns its own 401 response directly, without calling further down
+# the stack. Added in the other order, that 401 bypasses CORSMiddleware entirely and
+# reaches the browser with no Access-Control-Allow-Origin header; the browser then
+# refuses to hand the response to JS at all and fetch() throws a generic
+# "TypeError: Failed to fetch" — indistinguishable from the server being down. Every
+# expired or missing session hit exactly this, in every browser, not just one tab.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o for o in os.environ.get("cors_origins", "*").split(",") if o],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class LoginRequest(BaseModel):
