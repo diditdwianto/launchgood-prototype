@@ -175,7 +175,8 @@ def health() -> dict:
 
 @app.get("/api/queue")
 def queue() -> dict:
-    decided = db.decided_ids()
+    resolved = db.resolved_ids()
+    escalated = db.escalated_ids()
     campaigns = {c["campaign_id"]: c for c in all_campaigns()}
     items = []
 
@@ -197,13 +198,21 @@ def queue() -> dict:
                 "risk_tier": report.get("risk_tier"),
                 "recommendation": report.get("recommendation"),
                 "flag_count": len(report.get("flags", [])),
-                "decided": campaign_id in decided,
+                "decided": campaign_id in resolved,
+                "escalated": campaign_id in escalated,
             }
         )
 
-    # Errors first — a submission the pipeline could not assess needs a human
-    # sooner than one it scored as low risk.
-    items.sort(key=lambda i: (i["status"] != "error", -(i["risk_score"] or 0)))
+    # Errors first: a submission nobody could assess needs a human before one scored
+    # low. Escalated next: a reviewer has explicitly asked for a second opinion, which
+    # is a stronger claim on attention than any score.
+    items.sort(
+        key=lambda i: (
+            i["status"] != "error",
+            not i["escalated"],
+            -(i["risk_score"] or 0),
+        )
+    )
     return {"items": items, "scoring": scoring.explain()}
 
 
@@ -220,7 +229,13 @@ def campaign_detail(campaign_id: str) -> dict:
         "evidence_bundle": record["bundle"],
         "assessed_at": record["assessed_at"],
         "scoring": scoring.explain(),
-        "decided": campaign_id in db.decided_ids(),
+        "decided": campaign_id in db.resolved_ids(),
+        "escalated": campaign_id in db.escalated_ids(),
+        "history": [
+            e.model_dump(mode="json")
+            for e in db.decisions()
+            if e.campaign_id == campaign_id
+        ],
     }
 
 
@@ -230,7 +245,9 @@ class DecisionRequest(BaseModel):
 
 
 @app.post("/api/campaigns/{campaign_id}/decision")
-def decide(campaign_id: str, body: DecisionRequest) -> dict:
+def decide(
+    campaign_id: str, body: DecisionRequest, username: str = Depends(auth.current_user)
+) -> dict:
     record = db.get_assessment(campaign_id)
     if record is None:
         raise HTTPException(status_code=404, detail="campaign not found")
@@ -240,7 +257,7 @@ def decide(campaign_id: str, body: DecisionRequest) -> dict:
     from .agent.schemas import RiskReport
 
     report = RiskReport.model_validate(record["payload"]["report"])
-    entry = db.record_decision(report, body.decision, body.reviewer_note)
+    entry = db.record_decision(report, body.decision, body.reviewer_note, username)
     return {"logged": entry.model_dump(mode="json")}
 
 

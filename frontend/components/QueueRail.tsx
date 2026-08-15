@@ -78,7 +78,14 @@ export default function QueueRail() {
               <span className="mono text-muted text-[11px]">
                 {item.campaign_id}
               </span>
-              {item.status === "error" ? (
+              {item.escalated ? (
+                <span
+                  title="A reviewer asked for a second opinion. Still open."
+                  className="bg-medium-tint text-medium rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase"
+                >
+                  Escalated
+                </span>
+              ) : item.status === "error" ? (
                 <span className="bg-high-tint text-high rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
                   Failed
                 </span>

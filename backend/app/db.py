@@ -180,29 +180,36 @@ def all_assessments() -> dict[str, dict]:
 
 
 def classify_outcome(recommendation: str, human_decision: str) -> str:
-    """`manual_review` is a deferral, not a prediction.
+    """Agreement is only meaningful when both sides actually committed.
 
-    Counting "AI said manual_review, human rejected" as a disagreement would be
-    wrong — the AI asked a human to decide and a human decided, which is the
-    system working. Counting it as agreement would be worse, since it would let
-    the model score perfectly by never committing to anything. Deferrals are
-    therefore excluded from the agreement rate and tracked on their own.
+    `manual_review` is the AI declining to predict; escalation is the human declining
+    to decide. Neither is a judgment about the other, so neither belongs in the
+    agreement rate.
+
+    Escalation was previously scored as an override whenever the AI had said approve
+    or reject, which quietly penalised the model for cases where the reviewer simply
+    passed the campaign on. Counting deferrals as agreement would be worse still — a
+    model could score perfectly by never committing — so they are excluded from the
+    rate and tracked separately.
     """
-    if recommendation == "manual_review":
+    if human_decision == "escalate" or recommendation == "manual_review":
         return "deferred"
     return "agreed" if recommendation == human_decision else "overrode"
 
 
 def record_decision(
-    report: RiskReport, human_decision: Decision, reviewer_note: str = ""
+    report: RiskReport,
+    human_decision: Decision,
+    reviewer_note: str = "",
+    decided_by: str = "",
 ) -> DecisionLogEntry:
     outcome = classify_outcome(report.recommendation, human_decision)
 
     with connect() as conn:
         row = conn.execute(
             "INSERT INTO decisions (campaign_id, ai_recommendation, ai_confidence,"
-            " ai_risk_score, human_decision, outcome, reviewer_note)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s)"
+            " ai_risk_score, human_decision, outcome, reviewer_note, decided_by)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
             " RETURNING decided_at",
             (
                 report.campaign_id,
@@ -212,6 +219,7 @@ def record_decision(
                 human_decision,
                 outcome,
                 reviewer_note,
+                decided_by,
             ),
         ).fetchone()
 
@@ -223,6 +231,7 @@ def record_decision(
         human_decision=human_decision,
         outcome=outcome,
         reviewer_note=reviewer_note,
+        decided_by=decided_by,
         # Taken from the database, not from the app clock, so the timestamp matches
         # what was actually stored.
         decided_at=_iso(row["decided_at"]),
@@ -241,16 +250,40 @@ def decisions() -> list[DecisionLogEntry]:
             human_decision=r["human_decision"],
             outcome=r["outcome"],
             reviewer_note=r["reviewer_note"],
+            decided_by=r.get("decided_by") or "",
             decided_at=_iso(r["decided_at"]),
         )
         for r in rows
     ]
 
 
-def decided_ids() -> set[str]:
+def _latest_decisions() -> dict[str, str]:
+    """Most recent human decision per campaign.
+
+    Latest rather than any, because escalation is not the end of a campaign's life —
+    a second reviewer decides afterwards, and that later row is the one that counts.
+    """
     with connect() as conn:
-        rows = conn.execute("SELECT DISTINCT campaign_id FROM decisions").fetchall()
-    return {r["campaign_id"] for r in rows}
+        rows = conn.execute(
+            "SELECT DISTINCT ON (campaign_id) campaign_id, human_decision"
+            " FROM decisions ORDER BY campaign_id, decided_at DESC, id DESC"
+        ).fetchall()
+    return {r["campaign_id"]: r["human_decision"] for r in rows}
+
+
+def resolved_ids() -> set[str]:
+    """Campaigns that are finished. Escalated ones are not — they are waiting."""
+    return {c for c, d in _latest_decisions().items() if d in ("approve", "reject")}
+
+
+def escalated_ids() -> set[str]:
+    """Campaigns a reviewer handed on, still awaiting a second opinion.
+
+    These stay in the queue. Previously any decision row removed a campaign from it,
+    so escalating made it disappear with nobody assigned — the reviewer believed they
+    had handed it off and it had in fact been dropped.
+    """
+    return {c for c, d in _latest_decisions().items() if d == "escalate"}
 
 
 def outcome_counts() -> dict[str, int]:

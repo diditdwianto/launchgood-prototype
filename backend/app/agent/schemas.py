@@ -180,6 +180,7 @@ class DecisionLogEntry(BaseModel):
         "overridden, and the override rate is the drift signal worth monitoring."
     )
     reviewer_note: str = ""
+    decided_by: str = ""
     decided_at: str
 
 

@@ -223,9 +223,44 @@ export default function ReviewPage() {
         </pre>
       ) : null}
 
+      {data.escalated ? (
+        <div className="border-medium bg-medium-tint mb-5 rounded-lg border-l-[3px] px-4 py-3.5">
+          <p className="text-medium mb-1 text-sm font-semibold">
+            Escalated — awaiting a second reviewer
+          </p>
+          <p className="text-[13px] leading-relaxed">
+            {data.history[0]?.decided_by
+              ? `${data.history[0].decided_by} passed this on`
+              : "A reviewer passed this on"}
+            {data.history[0]?.reviewer_note
+              ? `: “${data.history[0].reviewer_note}”`
+              : "."}{" "}
+            It stays in the queue until someone approves or rejects it.
+          </p>
+          <p className="text-muted mt-2 text-[12.5px]">
+            Single-reviewer prototype: there is one account, so nothing prevents the
+            same person deciding. In production this would route to a different one.
+          </p>
+        </div>
+      ) : null}
+
+      {data.history.length > 0 ? (
+        <div className="border-line bg-panel mb-5 rounded-lg border px-4 py-3">
+          <div className="text-muted mb-2 text-[11px] font-semibold tracking-[0.06em] uppercase">
+            Decision history
+          </div>
+          {data.history.map((h, i) => (
+            <div key={i} className="mono text-muted py-0.5 text-[12px]">
+              {h.decided_at} · <span className="text-ink">{h.human_decision}</span>
+              {h.decided_by ? ` by ${h.decided_by}` : ""} · {h.outcome}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {data.decided ? (
         <div className="border-line bg-panel text-muted rounded-lg border px-4 py-3.5 text-sm">
-          A decision has already been logged for this campaign.
+          A final decision has been logged for this campaign.
         </div>
       ) : (
         <div className="bg-ground border-line sticky bottom-0 mt-6 border-t pt-5 pb-2">
@@ -255,7 +290,7 @@ export default function ReviewPage() {
               onClick={() => decide("escalate")}
               className="border-line hover:bg-panel rounded-lg border px-4.5 py-2.5 text-[13.5px] font-semibold transition-colors disabled:opacity-40"
             >
-              Escalate
+              {data.escalated ? "Escalate again" : "Escalate"}
             </button>
             <button
               disabled={!!busy}
