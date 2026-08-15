@@ -1,0 +1,763 @@
+<title>From Decision Log to Model</title>
+<style>
+  :root {
+    --ground: #eef1f3;
+    --panel: #ffffff;
+    --panel-2: #f6f8f9;
+    --ink: #121a19;
+    --ink-soft: #3c4749;
+    --muted: #66707a;
+    --line: #dde3e5;
+    --line-soft: #e7ecee;
+    --brand: #2f7a66;
+    --brand-deep: #245e4e;
+    --brand-tint: #e3efeb;
+    --gold: #8a6d18;
+    --gold-tint: #f6efdc;
+    --crimson: #a52836;
+    --crimson-tint: #fae8ea;
+
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+    --measure: 68ch;
+    --col: 780px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101514;
+      --panel: #171e1c;
+      --panel-2: #1c2523;
+      --ink: #e3eae7;
+      --ink-soft: #c2cdc9;
+      --muted: #8d9a9c;
+      --line: #28322f;
+      --line-soft: #222b29;
+      --brand: #55a98f;
+      --brand-deep: #7cc4ac;
+      --brand-tint: #17302a;
+      --gold: #cfa93f;
+      --gold-tint: #2c2617;
+      --crimson: #e0798a;
+      --crimson-tint: #331a1e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #101514;
+    --panel: #171e1c;
+    --panel-2: #1c2523;
+    --ink: #e3eae7;
+    --ink-soft: #c2cdc9;
+    --muted: #8d9a9c;
+    --line: #28322f;
+    --line-soft: #222b29;
+    --brand: #55a98f;
+    --brand-deep: #7cc4ac;
+    --brand-tint: #17302a;
+    --gold: #cfa93f;
+    --gold-tint: #2c2617;
+    --crimson: #e0798a;
+    --crimson-tint: #331a1e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 72px 28px 96px;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  h1 {
+    font-size: clamp(30px, 5vw, 40px);
+    line-height: 1.12;
+    letter-spacing: -0.022em;
+    font-weight: 640;
+    margin: 14px 0 0;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    max-width: var(--measure);
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    margin: 16px 0 0;
+  }
+
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 32px;
+    margin-bottom: 8px;
+  }
+
+  .context {
+    font-size: 13.5px;
+    color: var(--muted);
+    margin: 22px 0 0;
+    max-width: var(--measure);
+  }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: 52px; }
+
+  h2 {
+    font-size: 21px;
+    letter-spacing: -0.014em;
+    font-weight: 640;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--brand);
+    margin-right: 10px;
+    letter-spacing: 0;
+  }
+
+  h3 {
+    font-size: 15.5px;
+    font-weight: 640;
+    letter-spacing: -0.006em;
+    margin: 30px 0 6px;
+  }
+
+  p { max-width: var(--measure); margin: 0 0 14px; }
+  p:last-child { margin-bottom: 0; }
+
+  .lede { color: var(--ink-soft); margin-bottom: 20px; }
+
+  a { color: var(--brand-deep); }
+
+  strong { font-weight: 640; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--panel-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 4px;
+    padding: 0.1em 0.36em;
+  }
+
+  ul { max-width: var(--measure); margin: 0 0 14px; padding-left: 20px; }
+  li { margin-bottom: 7px; }
+  li::marker { color: var(--muted); }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; margin: 18px 0 20px; }
+
+  table {
+    width: 100%;
+    min-width: 520px;
+    border-collapse: collapse;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 14px;
+  }
+
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel-2);
+  }
+
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+    line-height: 1.5;
+  }
+
+  tr:last-child td { border-bottom: 0; }
+  td.tight { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brand);
+    border-radius: 0 9px 9px 0;
+    padding: 16px 18px;
+    margin: 20px 0;
+    max-width: var(--measure);
+  }
+
+  .note.warn { border-left-color: var(--gold); }
+  .note.stop { border-left-color: var(--crimson); }
+
+  .note h4 {
+    font-size: 13px;
+    font-weight: 640;
+    margin: 0 0 6px;
+    letter-spacing: -0.004em;
+  }
+
+  .note.warn h4 { color: var(--gold); }
+  .note.stop h4 { color: var(--crimson); }
+  .note p { font-size: 14px; margin-bottom: 0; color: var(--ink-soft); }
+  .note p + p { margin-top: 10px; }
+
+  /* ---------- layer stack ---------- */
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 22px 0;
+  }
+
+  .layer {
+    display: grid;
+    grid-template-columns: 76px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 13px 16px;
+  }
+
+  .layer.changed {
+    border-color: var(--brand);
+    background: var(--brand-tint);
+  }
+
+  .layer .who {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--brand-deep);
+    font-weight: 600;
+  }
+
+  .layer .does { font-size: 14px; line-height: 1.45; }
+  .layer .does em { color: var(--muted); font-style: normal; }
+
+  .layer .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+
+  .layer.changed .tag {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+
+  /* ---------- staged rollout ---------- */
+
+  .stages { display: flex; flex-direction: column; gap: 0; margin: 20px 0; }
+
+  .stage {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 18px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+
+  .stage:last-child { border-bottom: 0; }
+
+  .stage .n {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--brand);
+    padding-top: 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stage h4 {
+    font-size: 14.5px;
+    font-weight: 640;
+    margin: 0 0 3px;
+  }
+
+  .stage p {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin: 0 0 6px;
+  }
+
+  .stage .tools {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  /* ---------- checklist ---------- */
+
+  .check {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 6px 18px;
+    margin: 20px 0;
+  }
+
+  .check div {
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .check div:last-child { border-bottom: 0; }
+  .check .box { color: var(--brand); font-family: var(--mono); }
+
+  footer {
+    margin-top: 68px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    max-width: var(--measure);
+    line-height: 1.7;
+  }
+
+  @media (max-width: 640px) {
+    .wrap { padding: 48px 20px 72px; }
+    .layer { grid-template-columns: 1fr; gap: 6px; }
+    .layer .tag { justify-self: start; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="eyebrow">Campaign Trust Copilot · engineering note</div>
+    <h1>From decision log to model</h1>
+    <p class="standfirst">
+      What it would take to put a trained risk model behind campaign review — and why
+      the binding constraint is labels, not algorithms.
+    </p>
+    <p class="context">
+      Written against the current system: a LangGraph pipeline where deterministic
+      checks gather evidence, a language model reads it, a formula scores it, and a
+      human decides. This note covers replacing the formula.
+    </p>
+  </header>
+
+  <section>
+    <h2><span class="num">01</span>The constraint is labels</h2>
+    <p class="lede">
+      Nothing here is blocked on model architecture or infrastructure. Both are solved
+      problems for this shape of task. The thing you do not have is a few thousand
+      campaigns with known outcomes.
+    </p>
+    <p>
+      The useful consequence: the review console already in production is the label
+      generator. Every decision a reviewer records — the campaign, the evidence that
+      was available at the time, what the AI recommended, what the human actually did —
+      is one training row. That table is the asset. The model is downstream of it.
+    </p>
+    <div class="note">
+      <h4>Practical read</h4>
+      <p>
+        At zero labeled examples, a model is realistically 12–18 months out. The
+        highest-value work now is instrumenting so the dataset exists when you want it,
+        which is section 08.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">02</span>Decide what you are predicting</h2>
+    <p class="lede">
+      This is where most fraud-ML projects fail, and it fails early and quietly. Three
+      candidate targets, ordered by how soon the labels arrive.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Target</th><th>Label source</th><th class="tight">Lag</th><th>Catch</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Reviewer decision</strong><br>approve / reject / escalate</td>
+            <td>Decision log</td>
+            <td class="tight">None</td>
+            <td>Predicts your reviewers, not fraud. Inherits every bias they have.</td>
+          </tr>
+          <tr>
+            <td><strong>Bad outcome</strong><br>chargeback, clawback, takedown, complaint</td>
+            <td>Payments, support, trust &amp; safety</td>
+            <td class="tight">3–12 mo</td>
+            <td>Rare and delayed — but it is the only real signal.</td>
+          </tr>
+          <tr>
+            <td><strong>Needs escalation</strong></td>
+            <td>Decision log</td>
+            <td class="tight">None</td>
+            <td>Not a fraud model at all. A triage model, and the cheapest useful one.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Start on reviewer decision as a shadow model, because you can start this quarter.
+      Treat bad outcome as the target you migrate to once enough of them have accrued.
+      Be explicit in writing about which one a given model was trained on — the two get
+      conflated constantly, and they justify very different actions.
+    </p>
+
+    <div class="note warn">
+      <h4>Trap: the feedback loop</h4>
+      <p>
+        If you train on reviewer decisions while reviewers are looking at AI
+        recommendations, the model learns to predict its own past output, and accuracy
+        climbs while real-world value does not.
+      </p>
+      <p>
+        Log whether the reviewer saw a recommendation before deciding. Keep a slice
+        where they do not — an unassisted holdout is the only clean signal you will
+        have, and it is far cheaper to start collecting now than to reconstruct later.
+      </p>
+    </div>
+
+    <div class="note warn">
+      <h4>Trap: reject inference</h4>
+      <p>
+        You only observe outcomes for campaigns that were approved. Rejected ones have
+        no counterfactual, so the training data is censored by your own past decisions
+        and the model inherits them as ground truth.
+      </p>
+      <p>
+        This is the classic credit-scoring problem and has known treatments. The
+        important part is recognising you have it — untreated, it produces a model that
+        confidently reproduces yesterday's mistakes.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">03</span>Data requirements</h2>
+    <ul>
+      <li>
+        <strong>Volume.</strong> For gradient-boosted trees on tabular features, a few
+        thousand labeled rows minimum, with several hundred positives. At a 1–5% fraud
+        base rate that implies roughly 10k–100k campaigns to get there.
+      </li>
+      <li>
+        <strong>Point-in-time correctness.</strong> Every feature must hold the value
+        known <em>at submission</em>, not today. "Organiser has 3 prior campaigns"
+        computed at training time is a leak that will make offline metrics look
+        excellent and production performance collapse.
+      </li>
+      <li>
+        <strong>An immutable event log.</strong> Append-only, timestamped. Mutating a
+        campaign row in place destroys your ability to reconstruct what was true when
+        the decision was made.
+      </li>
+      <li>
+        <strong>Outcome plumbing.</strong> Chargebacks and clawbacks live in the
+        payments system. If they are never joined back to the campaign, the good target
+        from section 02 stays permanently unavailable.
+      </li>
+    </ul>
+
+    <div class="note">
+      <h4>Already correct in the current build</h4>
+      <p>
+        The <code>assessments</code> table snapshots the evidence bundle as it stood at
+        assessment time rather than recomputing it. That is the point-in-time property,
+        and it is the expensive one to retrofit. Keep it.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">04</span>Features</h2>
+    <p class="lede">
+      The deterministic layer is already a feature extractor. What is missing is the
+      category that usually matters most.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Group</th><th>Features</th><th class="tight">Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Registry</td>
+            <td>Status as a 5-way categorical, provider that answered, country coverage flag</td>
+            <td class="tight">Have</td>
+          </tr>
+          <tr>
+            <td>Duplication</td>
+            <td>Max text similarity, shared fingerprint count, provenance of the match</td>
+            <td class="tight">Have</td>
+          </tr>
+          <tr>
+            <td>Ask</td>
+            <td>Ratio to median first-time ask, absolute amount, category-relative ask</td>
+            <td class="tight">Have</td>
+          </tr>
+          <tr>
+            <td>Account</td>
+            <td>Age in days, prior campaigns, prior completion rate</td>
+            <td class="tight">Have</td>
+          </tr>
+          <tr>
+            <td>Media</td>
+            <td>Geo mismatch, capture-date staleness, image count</td>
+            <td class="tight">Have</td>
+          </tr>
+          <tr>
+            <td>Text</td>
+            <td>Sentence embeddings of the campaign body, length, language</td>
+            <td class="tight">Partial</td>
+          </tr>
+          <tr>
+            <td><strong>Linkage</strong></td>
+            <td>Shared device, IP, phone or <strong>payout bank account</strong> across organisers; graph distance to previously rejected organisers</td>
+            <td class="tight">Missing</td>
+          </tr>
+          <tr>
+            <td><strong>Velocity</strong></td>
+            <td>Submissions per organiser or IP per hour; burst detection</td>
+            <td class="tight">Missing</td>
+          </tr>
+          <tr>
+            <td><strong>Payout</strong></td>
+            <td>Destination country vs claimed country; recently changed bank details</td>
+            <td class="tight">Missing</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      Expect the missing three to outperform everything above them. In practice a fraud
+      ring is caught by a <strong>shared payout account</strong>, not by prose analysis.
+      Content features find the careless; linkage features find the organised.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">05</span>Model choice</h2>
+    <p class="lede">
+      Gradient-boosted trees — LightGBM, XGBoost or CatBoost — on tabular features.
+    </p>
+    <p>
+      For tabular fraud this consistently beats deep learning, trains in seconds, runs
+      on a CPU, and supports per-prediction SHAP attributions, which matters because
+      reviewers need a reason and not just a number.
+    </p>
+    <ul>
+      <li><strong>Text</strong> — sentence embeddings reduced and fed in as features, or a small separate classifier whose score becomes one feature.</li>
+      <li><strong>Images</strong> — perceptual hashing for near-duplicates; CLIP embeddings for stock-photo and reverse-image detection.</li>
+      <li><strong>Calibration</strong> — isotonic or Platt scaling, applied on a held-out slice. Boosted trees are badly calibrated out of the box and you need a genuine probability to threshold on.</li>
+    </ul>
+
+    <div class="note stop">
+      <h4>Do not fine-tune a language model for the score</h4>
+      <p>
+        It is more expensive, worse on tabular data, harder to explain, and it
+        reintroduces exactly the reproducibility problem the current architecture was
+        built to avoid. Keep the language model for reading unstructured claims, which
+        is the job it is uniquely good at.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">06</span>Where the model actually goes</h2>
+    <p class="lede">
+      It replaces the scoring formula. It does not replace the language model, and it
+      does not move the human boundary.
+    </p>
+
+    <div class="stack">
+      <div class="layer">
+        <span class="who">Code</span>
+        <span class="does">Gathers evidence, applies hard rules <em>— unchanged</em></span>
+        <span class="tag">as today</span>
+      </div>
+      <div class="layer changed">
+        <span class="who">Model</span>
+        <span class="does">Calibrated risk probability, replacing <code>high=35 / medium=15 / low=5</code></span>
+        <span class="tag">new</span>
+      </div>
+      <div class="layer">
+        <span class="who">LLM</span>
+        <span class="does">Reads unstructured claims, explains, covers the long tail <em>— unchanged</em></span>
+        <span class="tag">as today</span>
+      </div>
+      <div class="layer">
+        <span class="who">Human</span>
+        <span class="does">Approves, rejects, escalates <em>— unchanged</em></span>
+        <span class="tag">as today</span>
+      </div>
+    </div>
+
+    <p>
+      Keep the clamp. A model output that contradicts a hard rule is still a bug, and a
+      learned score is not exempt from that check simply because it was learned. The
+      override log stays the drift signal it already is.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="num">07</span>Stack, staged</h2>
+    <p class="lede">
+      Do not build the platform before the model. Each stage is only worth starting once
+      the previous one has produced something.
+    </p>
+
+    <div class="stages">
+      <div class="stage">
+        <span class="n">00</span>
+        <div>
+          <h4>Instrument</h4>
+          <p>No model. Log the fields section 08 lists, and wait for volume.</p>
+          <span class="tools">Postgres — already in place</span>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="n">01</span>
+        <div>
+          <h4>Offline</h4>
+          <p>Train on history in a notebook. The only question that matters: does it beat the current formula on held-out time periods?</p>
+          <span class="tools">pandas · LightGBM · scikit-learn · MLflow</span>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="n">02</span>
+        <div>
+          <h4>Shadow</h4>
+          <p>Score nightly in batch. Record predictions, show nobody. Compare against what reviewers actually did.</p>
+          <span class="tools">cron or Dagster · model artifact in object storage</span>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="n">03</span>
+        <div>
+          <h4>Online</h4>
+          <p>Serve in-process behind the existing API. Surface SHAP attributions next to the score so a reviewer can see which features drove it.</p>
+          <span class="tools">FastAPI · joblib · SHAP</span>
+        </div>
+      </div>
+      <div class="stage">
+        <span class="n">04</span>
+        <div>
+          <h4>Only if warranted</h4>
+          <p>A feature store earns its place when online and offline feature values demonstrably diverge — not before.</p>
+          <span class="tools">Feast · Evidently</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">08</span>Evaluation</h2>
+    <ul>
+      <li><strong>PR-AUC, not ROC-AUC.</strong> ROC flatters models badly at low base rates; with 2% positives a useless model still looks respectable.</li>
+      <li><strong>Precision@k</strong>, where <em>k</em> is how many campaigns the team can actually review per day. That is the real operating metric, and it is the one to put in front of anyone deciding whether to fund the work.</li>
+      <li><strong>Cost-sensitive thresholds.</strong> A false positive costs a legitimate organiser real money and costs the reviewer their trust in the tool. A false negative defrauds donors. These are not symmetric — choose the ratio deliberately rather than defaulting to 0.5.</li>
+      <li><strong>Time-based splits, never random.</strong> A random split leaks the future into the past and inflates everything.</li>
+    </ul>
+
+    <div class="note stop">
+      <h4>Slice by country and language — non-negotiable here</h4>
+      <p>
+        A model trained mostly on US and UK data will systematically over-flag campaigns
+        from exactly the regions with no registry coverage, because absence of
+        corroborating evidence correlates with missing public infrastructure rather than
+        with fraud.
+      </p>
+      <p>
+        In aggregate that looks like accuracy. Sliced by country it is a fairness
+        failure that falls hardest on the communities this platform exists to serve. Set
+        per-slice minimums before training, not after the first incident.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="num">09</span>What to instrument now</h2>
+    <p class="lede">
+      Small schema changes today; the difference between having a usable dataset in a
+      year and starting to collect one then.
+    </p>
+
+    <div class="check">
+      <div><span class="box">[ ]</span><span>Capture device fingerprint, IP and user agent on submission.</span></div>
+      <div><span class="box">[ ]</span><span>Capture payout destination — bank or wallet identifier, hashed — and flag when it changes.</span></div>
+      <div><span class="box">[ ]</span><span>Log whether the reviewer saw the AI recommendation before deciding.</span></div>
+      <div><span class="box">[ ]</span><span>Keep a small unassisted holdout where reviewers decide without seeing a recommendation.</span></div>
+      <div><span class="box">[ ]</span><span>Record time-to-decision per campaign; a proxy for difficulty and a target in its own right.</span></div>
+      <div><span class="box">[ ]</span><span>Join chargebacks, refunds and takedowns back to the campaign ID.</span></div>
+      <div><span class="box">[ ]</span><span>Version the feature extraction, so a row can be traced to the code that produced it.</span></div>
+      <div><span class="box">[ ]</span><span>Never mutate an assessment in place — append a new one.</span></div>
+    </div>
+
+    <p>
+      The last two are the ones people skip and regret. Without a feature version you
+      cannot tell whether a metric moved because the model changed or because the
+      extraction did.
+    </p>
+  </section>
+
+  <footer>
+    Engineering note for Campaign Trust Copilot · covers replacing the deterministic
+    scoring formula with a learned model. Everything else in the architecture — the
+    evidence layer, the language model, the human decision boundary — is intended to
+    stay as it is.
+  </footer>
+
+</div>
