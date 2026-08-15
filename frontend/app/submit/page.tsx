@@ -308,10 +308,16 @@ export default function SubmitPage() {
                 AI reasoning summary
               </div>
               <p className="text-sm leading-relaxed">{report.reasoning_summary}</p>
-              <p className="mono text-muted mt-2.5 text-[11.5px]">
-                confidence <b className="text-ink">{report.confidence.toFixed(2)}</b> ·{" "}
-                <b className="text-ink">{report.recommendation}</b>
-              </p>
+              {report.confidence !== null ? (
+                <p className="mono text-muted mt-2.5 text-[11.5px]">
+                  confidence <b className="text-ink">{report.confidence.toFixed(2)}</b>{" "}
+                  · <b className="text-ink">{report.recommendation}</b>
+                </p>
+              ) : (
+                <p className="mono text-muted mt-2.5 text-[11.5px]">
+                  withheld — this campaign is in the unassisted review holdout
+                </p>
+              )}
             </div>
             <div className="flex-shrink-0 text-right">
               <div

@@ -17,7 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from . import auth, db
+from . import auth, db, holdout
 from .agent import scoring, tools
 from .agent.graph import assess, assess_stream
 from .agent.schemas import Decision
@@ -185,6 +185,9 @@ def queue() -> dict:
         if campaign is None:
             continue
         payload = record["payload"]
+        assisted = holdout.is_assisted(campaign_id)
+        if not assisted:
+            payload = holdout.strip_model_output(payload)
         report = payload.get("report") or {}
         items.append(
             {
@@ -200,6 +203,7 @@ def queue() -> dict:
                 "flag_count": len(report.get("flags", [])),
                 "decided": campaign_id in resolved,
                 "escalated": campaign_id in escalated,
+                "assisted": assisted,
             }
         )
 
@@ -223,10 +227,15 @@ def campaign_detail(campaign_id: str) -> dict:
     if campaign is None or record is None:
         raise HTTPException(status_code=404, detail="campaign not found")
 
+    assisted = holdout.is_assisted(campaign_id)
+    payload = record["payload"] if assisted else holdout.strip_model_output(record["payload"])
+
     return {
         "campaign": campaign,
-        "assessment": record["payload"],
+        "assessment": payload,
+        # The bundle is deterministic evidence, not model output, so it stays visible.
         "evidence_bundle": record["bundle"],
+        "assisted": assisted,
         "assessed_at": record["assessed_at"],
         "scoring": scoring.explain(),
         "decided": campaign_id in db.resolved_ids(),
@@ -257,7 +266,13 @@ def decide(
     from .agent.schemas import RiskReport
 
     report = RiskReport.model_validate(record["payload"]["report"])
-    entry = db.record_decision(report, body.decision, body.reviewer_note, username)
+    entry = db.record_decision(
+        report,
+        body.decision,
+        body.reviewer_note,
+        username,
+        recommendation_visible=holdout.is_assisted(campaign_id),
+    )
     return {"logged": entry.model_dump(mode="json")}
 
 
@@ -384,6 +399,7 @@ def telemetry(request: Request, probe: bool = False) -> dict:
     data["signed_in"] = signed_in
     data["probe_available"] = signed_in
     data["scoring"] = scoring.explain()
+    data["training"] = db.training_readiness()
     data["captured_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return data
 

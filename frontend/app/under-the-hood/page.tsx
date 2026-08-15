@@ -357,6 +357,132 @@ export default function UnderTheHoodPage() {
         <Row label="Decision log" value={data.database} real />
       </div>
 
+      <SectionLabel>Next: replace the formula with a trained model</SectionLabel>
+      <p className="text-muted mb-4 max-w-[660px] text-[13.5px] leading-relaxed">
+        The severity weights are a judgment call. high=35, medium=15, low=5 are numbers
+        chosen by hand, not learned from outcomes. A trained model would replace that
+        one arithmetic step and nothing else.
+      </p>
+
+      <div className="mb-6 flex flex-col gap-2">
+        {[
+          ["Code", "Gathers evidence, applies hard rules", "as today", false],
+          ["Model", "Learned risk probability, replacing high=35 / medium=15 / low=5", "the change", true],
+          ["LLM", "Reads claims, explains, covers the long tail", "as today", false],
+          ["Human", "Approves, rejects, escalates", "as today", false],
+        ].map(([who, does, tag, changed]) => (
+          <div
+            key={who as string}
+            className={`flex items-center gap-4 rounded-lg border px-4 py-3 ${
+              changed
+                ? "border-brand bg-brand-tint"
+                : "border-line bg-panel"
+            }`}
+          >
+            <span className="mono text-brand-deep w-[62px] flex-shrink-0 text-[11px] font-semibold tracking-wide uppercase">
+              {who as string}
+            </span>
+            <span className="flex-1 text-[13.5px] leading-snug">{does as string}</span>
+            <span
+              className={`mono flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] tracking-wide uppercase ${
+                changed
+                  ? "bg-brand text-white"
+                  : "border-line text-muted border bg-transparent"
+              }`}
+            >
+              {tag as string}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <h3 className="mb-2 text-[14px] font-semibold">Why it is worth doing</h3>
+      <ul className="text-muted mb-5 max-w-[660px] list-disc pl-5 text-[13.5px] leading-relaxed">
+        <li className="mb-1.5">
+          <span className="text-ink">Better ordering.</span> Reviewers work top-down and
+          get through a fixed number per day. A learned score ranks the queue by what
+          actually turned out to need attention, so the same effort catches more.
+        </li>
+        <li className="mb-1.5">
+          <span className="text-ink">Weights from outcomes, not opinion.</span> Whether
+          an unverified organisation matters more than a duplicate image is currently
+          my guess. It is answerable from data.
+        </li>
+        <li className="mb-1.5">
+          <span className="text-ink">Cheaper and faster than it looks.</span> Gradient
+          boosted trees on the features the deterministic layer already computes. No
+          GPU, no model call, milliseconds per campaign — and SHAP gives a per-campaign
+          reason, which reviewers need.
+        </li>
+        <li>
+          <span className="text-ink">The features already exist.</span> Registry state,
+          duplicate similarity, ask ratio, account age, geo mismatch — every one is
+          already computed and stored per assessment.
+        </li>
+      </ul>
+
+      <h3 className="mb-2 text-[14px] font-semibold">What it needs first</h3>
+      <p className="text-muted mb-3 max-w-[660px] text-[13.5px] leading-relaxed">
+        Labels, and nothing else is blocking. The decision log is the training set: each
+        approve or reject is one labelled row. Escalations do not count — they record a
+        reviewer declining to decide, which is not a label.
+      </p>
+
+      <div className="bg-panel border-line mb-3 rounded-lg border px-4 py-3.5">
+        <Meter
+          label="Decisive labels (approve or reject)"
+          used={data.training.decisive_labels}
+          total={data.training.target_labels}
+          caption={`${data.training.decisive_labels} of ~${data.training.target_labels.toLocaleString()}`}
+        />
+        <Meter
+          label="Minority class — rejections"
+          used={data.training.reject}
+          total={data.training.target_minority}
+          caption={`${data.training.reject} of ~${data.training.target_minority}`}
+        />
+        <p className="mono text-muted mt-2.5 text-[11px]">
+          logged so far: {data.training.approve} approve · {data.training.reject} reject
+          · {data.training.escalate} escalate (excluded)
+        </p>
+      </div>
+
+      <p className="text-muted mb-5 max-w-[660px] text-[12.5px] leading-relaxed">
+        Those targets are rules of thumb for tabular gradient boosting, not measurements
+        from this platform: roughly 2,000 labelled decisions, with at least a couple of
+        hundred of the rarer class. Below that a model will not beat a hand-tuned
+        formula, and fitting one anyway produces a confident-looking system with nothing
+        behind it. At current volume this is a year of collection, which is why the
+        useful work now is logging rather than modelling.
+      </p>
+
+      <div className="border-brand bg-panel mb-8 max-w-[660px] rounded-r-lg border border-l-[3px] px-4 py-3.5">
+        <p className="mb-2 text-[13px] leading-relaxed">
+          <span className="text-ink font-semibold">
+            The one trap that cannot be fixed later — already handled.
+          </span>{" "}
+          Reviewers who see a recommendation before deciding produce decisions that
+          partly measure the model&apos;s own influence. Train on those and accuracy
+          climbs while real value does not. There is no way to separate them
+          afterwards, so the distinction is recorded now.
+        </p>
+        <p className="text-muted mb-2 text-[12.5px] leading-relaxed">
+          A share of campaigns is assigned to an unassisted holdout, deterministically
+          by campaign id so a reload cannot reroll it. For those, the score,
+          recommendation, confidence and summary are stripped from the API response
+          server-side — the deterministic evidence still shows, since the point is to
+          remove the model&apos;s opinion, not to test blind review. Every decision
+          records which mode it was made under.
+        </p>
+        <p className="mono text-muted text-[11.5px]">
+          labels so far: {data.training.unassisted_labels} unassisted ·{" "}
+          {data.training.assisted_labels} assisted
+          {data.training.unknown_labels > 0
+            ? ` · ${data.training.unknown_labels} predate the distinction`
+            : ""}
+        </p>
+      </div>
+
       <SectionLabel>Cost this process</SectionLabel>
       <div className="bg-panel border-line mb-8 grid grid-cols-4 gap-px overflow-hidden rounded-lg border">
         <Stat label="Calls" value={String(data.totals.calls)} />

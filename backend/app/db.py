@@ -202,14 +202,16 @@ def record_decision(
     human_decision: Decision,
     reviewer_note: str = "",
     decided_by: str = "",
+    recommendation_visible: bool = True,
 ) -> DecisionLogEntry:
     outcome = classify_outcome(report.recommendation, human_decision)
 
     with connect() as conn:
         row = conn.execute(
             "INSERT INTO decisions (campaign_id, ai_recommendation, ai_confidence,"
-            " ai_risk_score, human_decision, outcome, reviewer_note, decided_by)"
-            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"
+            " ai_risk_score, human_decision, outcome, reviewer_note, decided_by,"
+            " recommendation_visible)"
+            " VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)"
             " RETURNING decided_at",
             (
                 report.campaign_id,
@@ -220,6 +222,7 @@ def record_decision(
                 outcome,
                 reviewer_note,
                 decided_by,
+                recommendation_visible,
             ),
         ).fetchone()
 
@@ -335,3 +338,51 @@ def next_campaign_id() -> str:
             " FROM submitted_campaigns WHERE campaign_id ~ '^CMP-[0-9]+$'"
         ).fetchone()
     return f"CMP-{max(row['n'] or 0, 4499) + 1}"
+
+
+def training_readiness() -> dict:
+    """How close the decision log is to being a usable training set.
+
+    Counts the labels a model would actually learn from. Escalations are excluded:
+    they record that a reviewer declined to decide, which is not a label for
+    "approve or reject", so counting them would overstate readiness.
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT human_decision, COUNT(*) AS n FROM decisions GROUP BY human_decision"
+        ).fetchall()
+    counts = {r["human_decision"]: r["n"] for r in rows}
+    approve = counts.get("approve", 0)
+    reject = counts.get("reject", 0)
+    return {
+        "decisive_labels": approve + reject,
+        "approve": approve,
+        "reject": reject,
+        "escalate": counts.get("escalate", 0),
+        # Rules of thumb for tabular gradient boosting, not measurements from this
+        # platform. Stated as targets so the gap is visible rather than implied.
+        "target_labels": 2000,
+        "target_minority": 200,
+        **_assisted_split(),
+    }
+
+
+def _assisted_split() -> dict:
+    """Decisive labels split by whether the reviewer saw the recommendation.
+
+    The unassisted count is the one that matters: assisted decisions are partly a
+    measurement of the model's own influence, so a training set made only of them
+    cannot show whether the model is right, only whether it is self-consistent.
+    """
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT recommendation_visible AS seen, COUNT(*) AS n FROM decisions"
+            " WHERE human_decision IN ('approve','reject')"
+            " GROUP BY recommendation_visible"
+        ).fetchall()
+    by = {r["seen"]: r["n"] for r in rows}
+    return {
+        "assisted_labels": by.get(True, 0),
+        "unassisted_labels": by.get(False, 0),
+        "unknown_labels": by.get(None, 0),
+    }

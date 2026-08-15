@@ -109,11 +109,8 @@ export default function ReviewPage() {
         <h1 className="max-w-[540px] text-[22px] leading-tight font-semibold tracking-tight">
           {campaign.title}
         </h1>
-        {assessment.status === "ok" ? (
-          <div
-            className="flex-shrink-0 text-right"
-            title={data.scoring}
-          >
+        {assessment.status === "ok" && assessment.report.risk_tier ? (
+          <div className="flex-shrink-0 text-right" title={data.scoring}>
             <div
               className={`mono text-[30px] leading-none font-medium ${SCORE_COLOR[assessment.report.risk_tier]}`}
             >
@@ -175,6 +172,26 @@ export default function ReviewPage() {
         </div>
       ) : (
         <>
+          {!data.assisted ? (
+            <section className="border-brand bg-brand-tint mb-6 rounded-lg border-l-[3px] px-4.5 py-4">
+              <h2 className="text-brand-deep mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">
+                Unassisted review
+              </h2>
+              <p className="text-[13.5px] leading-relaxed">
+                The model&apos;s score, recommendation and summary are withheld for this
+                campaign. Decide from the evidence below.
+              </p>
+              <p className="text-muted mt-2 text-[12.5px] leading-relaxed">
+                A share of campaigns is reviewed this way on purpose. Decisions made
+                while looking at a recommendation partly measure the model&apos;s own
+                influence, so they cannot be used to check whether it is right. These
+                are the only decisions that can. The output is removed server-side, not
+                hidden in the page.
+              </p>
+            </section>
+          ) : null}
+
+          {data.assisted ? (
           <section className="bg-panel border-line mb-6 rounded-lg border px-4.5 py-4">
             <h2 className="text-brand-deep mb-1.5 text-[11px] font-semibold tracking-[0.08em] uppercase">
               AI reasoning summary
@@ -198,6 +215,7 @@ export default function ReviewPage() {
               </p>
             ) : null}
           </section>
+          ) : null}
 
           <SectionLabel>
             Evidence trail · {assessment.report.flags.length}{" "}
@@ -206,8 +224,9 @@ export default function ReviewPage() {
 
           {assessment.report.flags.length === 0 ? (
             <p className="bg-panel border-line text-muted mb-6 rounded-lg border px-4 py-3.5 text-sm">
-              No flags raised. Every automated check passed and the model found
-              nothing further in the campaign text.
+              {data.assisted
+                ? "No flags raised. Every automated check passed and the model found nothing further in the campaign text."
+                : "No flags raised by the automated checks."}
             </p>
           ) : (
             assessment.report.flags.map((f, i) => <FlagCard key={i} flag={f} />)
@@ -326,7 +345,7 @@ export default function ReviewPage() {
               {busy === "reassess" ? "Re-running…" : "Re-run assessment"}
             </button>
 
-            {assessment.status === "ok" ? (
+            {assessment.status === "ok" && assessment.report.confidence !== null ? (
               <span className="mono text-muted ml-auto text-[11.5px]">
                 AI confidence{" "}
                 <b className="text-ink">
@@ -334,7 +353,11 @@ export default function ReviewPage() {
                 </b>{" "}
                 · <b className="text-ink">{assessment.report.recommendation}</b>
               </span>
-            ) : null}
+            ) : (
+              <span className="mono text-muted ml-auto text-[11.5px]">
+                recommendation withheld
+              </span>
+            )}
           </div>
           <p className="text-muted mt-2.5 text-[11.5px]">
             The AI never approves, rejects, or releases funds. This is the only
