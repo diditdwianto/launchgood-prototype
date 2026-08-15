@@ -57,6 +57,30 @@ const SPLIT = [
   ["What happens to this campaign?", "human", "Always."],
 ] as const;
 
+const OWNERS = [
+  {
+    key: "code",
+    title: "Code",
+    rule: "Owns anything settled by a lookup or arithmetic.",
+    wrongness:
+      "A deterministic function: same input, same output, always. It can be wrong — but only because the rule is wrong, and then it is wrong identically on every campaign, which makes it findable and fixable.",
+  },
+  {
+    key: "model",
+    title: "Model",
+    rule: "Owns only what cannot be written as a rule.",
+    wrongness:
+      "A language model reading text and exercising judgment. It can be wrong differently on each run, so it is never given anything that has to be reproducible — no scores, no arithmetic, no lookups.",
+  },
+  {
+    key: "human",
+    title: "Human",
+    rule: "Owns the decision. Always.",
+    wrongness:
+      "Code computes and the model recommends; neither approves anything. A person can be wrong too, but they can see every piece of evidence behind the recommendation, and their name is on the outcome.",
+  },
+];
+
 const OWNER_STYLE: Record<string, string> = {
   code: "bg-brand-tint text-brand-deep",
   model: "bg-medium-tint text-medium",
@@ -105,6 +129,44 @@ export default function UnderTheHoodPage() {
           real model tokens.
         </p>
       ) : null}
+
+      <SectionLabel>What the three labels mean</SectionLabel>
+      <div className="mb-3 grid grid-cols-3 gap-3">
+        {OWNERS.map((o) => (
+          <div key={o.key} className="bg-panel border-line rounded-lg border px-4 py-3.5">
+            <div className="mb-2 flex items-center gap-2">
+              <span
+                className={`${OWNER_STYLE[o.key]} rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase`}
+              >
+                {o.key}
+              </span>
+              <span className="text-[13px] font-semibold">{o.title}</span>
+            </div>
+            <p className="text-ink mb-1.5 text-[12.5px] font-medium">{o.rule}</p>
+            <p className="text-muted text-[12px] leading-relaxed">{o.wrongness}</p>
+          </div>
+        ))}
+      </div>
+      <p className="text-muted mb-8 max-w-[660px] text-[12.5px] leading-relaxed">
+        The split is not about who touches the data — it is about{" "}
+        <strong className="text-ink font-medium">
+          who can be held to what kind of wrongness
+        </strong>
+        . Two consequences worth knowing:
+        <br />
+        <br />
+        The label marks who owns the <em>decision</em> in a step, not who does the work
+        in it. <span className="mono text-[11.5px]">ask_and_media</span> uses code to
+        establish that the photos are geo-tagged Turkey while the campaign claims Gaza —
+        that part is a comparison. Whether that amounts to a material inconsistency is a
+        judgment, so it reaches the model as a fact rather than as a flag.
+        <br />
+        <br />
+        And the model step is bounded by code on <em>both</em> sides. It receives a fixed
+        evidence bundle, and afterwards its output has reserved flag types stripped, is
+        clamped if it contradicts itself, and is scored arithmetically. The model is
+        never the last word, even inside its own step.
+      </p>
 
       <SectionLabel>The pipeline</SectionLabel>
       <ol className="bg-panel border-line mb-8 rounded-lg border">
