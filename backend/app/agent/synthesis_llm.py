@@ -24,10 +24,10 @@ import time
 from dataclasses import dataclass
 
 from openai import OpenAI
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from .prompts import SYNTHESIS_SYSTEM
-from .schemas import Flag, SynthesisDraft
+from .prompts import CLARIFICATION_SYSTEM, SYNTHESIS_SYSTEM
+from .schemas import ClarificationDraft, Flag, SynthesisDraft
 
 logger = logging.getLogger(__name__)
 
@@ -284,17 +284,48 @@ def _is_quota_exhausted(exc: Exception) -> bool:
         return False
 
 
+_DURATION_RE = re.compile(r"(?:(\d+)m)?(\d+(?:\.\d+)?)s|(\d+)ms")
+
+
+def _parse_groq_duration(text: str) -> float | None:
+    """Parse Groq's `Xm Ys` / `Ys` / `Xms` reset-time format into seconds.
+
+    Discovered this was needed the hard way: Groq does not send a `Retry-After`
+    header on 429s at all — the real wait time is only in `x-ratelimit-reset-tokens`,
+    in this format. Every 429 retry before this fix was guessing with blind
+    exponential backoff instead of reading the number the server actually sent.
+    """
+    match = _DURATION_RE.fullmatch(text.strip())
+    if not match:
+        return None
+    minutes, seconds, millis = match.groups()
+    if millis is not None:
+        return int(millis) / 1000
+    return (int(minutes) * 60 if minutes else 0) + float(seconds)
+
+
 def _retry_delay(exc: Exception, attempt: int) -> float | None:
     """None means do not retry."""
     status = getattr(exc, "status_code", None)
 
     if status == 429:
         response = getattr(exc, "response", None)
-        header = response.headers.get("retry-after") if response is not None else None
-        try:
-            return min(float(header), 30.0) if header else 2.0 * 2**attempt
-        except (TypeError, ValueError):
-            return 2.0 * 2**attempt
+        headers = response.headers if response is not None else {}
+        # `retry-after` is the HTTP-standard header; Groq does not send it in
+        # practice, but checking first costs nothing and covers any provider that
+        # does. `x-ratelimit-reset-tokens` is what Groq actually sends.
+        header = headers.get("retry-after")
+        if header:
+            try:
+                return min(float(header), 30.0)
+            except (TypeError, ValueError):
+                pass
+        reset = headers.get("x-ratelimit-reset-tokens")
+        if reset:
+            parsed = _parse_groq_duration(reset)
+            if parsed is not None:
+                return min(parsed + 0.5, 30.0)  # +0.5s: land just after the window opens
+        return 2.0 * 2**attempt
 
     if status == 400:
         code = _error_code(exc)
@@ -308,9 +339,17 @@ def _retry_delay(exc: Exception, attempt: int) -> float | None:
     return None
 
 
-def _call_one(model: str, messages: list[dict]) -> str:
-    """Try a single model, retrying only genuinely transient failures."""
-    schema = SynthesisDraft.model_json_schema()
+def _call_one(
+    model: str, messages: list[dict], response_model: type[BaseModel], schema_name: str
+) -> str:
+    """Try a single model, retrying only genuinely transient failures.
+
+    Generic over the response schema — this is the shared machinery behind both
+    `llm_synthesize` (SynthesisDraft) and `draft_clarification` (ClarificationDraft).
+    A second structured-output task should not mean a second retry/fallback/quota
+    implementation to keep correct.
+    """
+    schema = response_model.model_json_schema()
     spec = MODELS[model]
 
     for attempt in range(MAX_TRANSIENT_RETRIES + 1):
@@ -321,7 +360,7 @@ def _call_one(model: str, messages: list[dict]) -> str:
                 messages=messages,
                 response_format={
                     "type": "json_schema",
-                    "json_schema": {"name": "risk_synthesis", "strict": True, "schema": schema},
+                    "json_schema": {"name": schema_name, "strict": True, "schema": schema},
                 },
                 temperature=0.2,
                 timeout=spec.timeout,
@@ -360,6 +399,7 @@ def _call_one(model: str, messages: list[dict]) -> str:
             # attempt 0 — it stays in the conversation for the rest of the retries.
             # Re-appending it on every attempt would just stack up identical messages.
             if _error_code(exc) in SCHEMA_FAILURE_CODES and attempt == 0:
+                required = ", ".join(schema.get("required", []))
                 messages = messages + [
                     {
                         "role": "user",
@@ -368,11 +408,10 @@ def _call_one(model: str, messages: list[dict]) -> str:
                             f"{str(exc)[:600]}\n\n"
                             "Either a field used a value the schema does not permit, or "
                             "the response stopped before the object was complete. Return "
-                            "the full JSON object with every required field present — "
-                            "flags, recommendation, confidence, and reasoning_summary — "
-                            "using only the enum values the schema allows. If your evidence "
-                            "text was very long, shorten it; do not let it crowd out the "
-                            "fields after it. Do not change your findings."
+                            f"the full JSON object with every required field present — "
+                            f"{required} — using only the enum values the schema allows. "
+                            "If any text field was very long, shorten it; do not let it "
+                            "crowd out the fields after it. Do not change your findings."
                         ),
                     }
                 ]
@@ -391,31 +430,74 @@ def _call_one(model: str, messages: list[dict]) -> str:
     raise RuntimeError("unreachable")
 
 
-def _call(messages: list[dict]) -> str:
-    """Walk the chain, moving on when a model's quota is gone.
+def _call(messages: list[dict], response_model: type[BaseModel], schema_name: str) -> str:
+    """Walk the chain, moving on when a model isn't working right now.
 
     Falling back is a real change in behaviour, not a transparent retry: a different
     model produces different flags, and the NVIDIA tail is an order of magnitude
     slower. It is logged and surfaced in /api/health so nobody is quietly reading
     output from a model they did not choose.
+
+    Two different reasons a model can fail here, handled differently. A daily quota
+    is exhausted for the rest of the day — `_exhausted` remembers that, so this
+    process stops trying it. A per-minute rate limit is not: `_call_one` already
+    retried it within its own budget and gave up, but the model will very likely
+    work again on the next campaign a few seconds later, so it is not marked
+    exhausted — only skipped for this one call. Before this distinction existed, a
+    per-minute 429 on the first model in the chain failed the whole assessment
+    rather than falling through to a second model that almost certainly had headroom
+    of its own — observed directly on CMP-4476, where gpt-oss-20b hit its per-minute
+    cap and the assessment failed outright instead of trying gpt-oss-120b.
     """
     chain = usable_chain() or model_chain()[-1:]
     last: Exception | None = None
 
     for model in chain:
         try:
-            return _call_one(model, messages)
+            return _call_one(model, messages, response_model, schema_name)
         except Exception as exc:  # noqa: BLE001
             last = exc
-            if _is_quota_exhausted(exc) and model != chain[-1]:
+            if _is_quota_exhausted(exc):
                 _exhausted.add(model)
                 logger.warning(
-                    "quota exhausted for %s, falling back to next model in chain", model
+                    "daily quota exhausted for %s, falling back to next model in chain", model
                 )
+            else:
+                logger.warning(
+                    "%s did not succeed within its own retry budget (%s), "
+                    "falling back to next model in chain",
+                    model,
+                    type(exc).__name__,
+                )
+            if model != chain[-1]:
                 continue
             raise
 
     raise last if last else RuntimeError("no models available in chain")
+
+
+def _call_structured(
+    messages: list[dict], response_model: type[BaseModel], schema_name: str, repair_hint: str
+):
+    """`_call` plus one extra repair round if Groq's own strict-mode check passed but
+    our own (stricter, e.g. numeric range) validation still rejects the result."""
+    raw = _call(messages, response_model, schema_name)
+    try:
+        return response_model.model_validate_json(raw)
+    except ValidationError as exc:
+        if SCHEMA_REPAIR_ATTEMPTS < 1:
+            raise
+        messages = messages + [
+            {"role": "assistant", "content": raw},
+            {
+                "role": "user",
+                "content": (
+                    f"That response failed validation:\n{exc}\n\n"
+                    f"Return corrected JSON matching the schema exactly. {repair_hint}"
+                ),
+            },
+        ]
+        return response_model.model_validate_json(_call(messages, response_model, schema_name))
 
 
 def llm_synthesize(bundle: str, preexisting: str, pre_flags: list[Flag]) -> SynthesisDraft:
@@ -432,25 +514,40 @@ def llm_synthesize(bundle: str, preexisting: str, pre_flags: list[Flag]) -> Synt
         {"role": "system", "content": SYNTHESIS_SYSTEM},
         {"role": "user", "content": user},
     ]
+    return _call_structured(
+        messages,
+        SynthesisDraft,
+        "risk_synthesis",
+        "Do not add new flags or change your findings; fix only the structure.",
+    )
 
-    raw = _call(messages)
-    try:
-        return SynthesisDraft.model_validate_json(raw)
-    except ValidationError as exc:
-        if SCHEMA_REPAIR_ATTEMPTS < 1:
-            raise
-        messages += [
-            {"role": "assistant", "content": raw},
-            {
-                "role": "user",
-                "content": (
-                    f"That response failed validation:\n{exc}\n\n"
-                    "Return corrected JSON matching the schema exactly. Do not add new "
-                    "flags or change your findings; fix only the structure."
-                ),
-            },
-        ]
-        return SynthesisDraft.model_validate_json(_call(messages))
+
+def draft_clarification(campaign: dict, claim: str, evidence_summary: str) -> ClarificationDraft:
+    """Draft a request-for-more-information message about one specific finding.
+
+    Deliberately narrow: one claim per call. A reviewer choosing which finding to
+    follow up on is the human-in-the-loop moment; batching several claims into one
+    message would blur exactly the specificity the finding's `claim` field exists to
+    provide.
+    """
+    user = (
+        f"Campaign: {campaign['title']}\n"
+        f"Organizer: {campaign['organizer_name']}\n\n"
+        f"Campaign text (match this language in your draft):\n{campaign['body']}\n\n"
+        f"Claim to ask about: {claim}\n"
+        f"What the evidence showed: {evidence_summary}\n\n"
+        "Draft the message."
+    )
+    messages = [
+        {"role": "system", "content": CLARIFICATION_SYSTEM},
+        {"role": "user", "content": user},
+    ]
+    return _call_structured(
+        messages,
+        ClarificationDraft,
+        "clarification_draft",
+        "Do not change what you are asking about; fix only the structure.",
+    )
 
 
 def probe_limits() -> None:

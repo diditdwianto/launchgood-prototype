@@ -64,6 +64,26 @@ Recommendation = Literal["approve", "manual_review", "reject"]
 Decision = Literal["approve", "reject", "escalate"]
 
 
+NextAction = Literal["none", "verify_manually", "request_more_information", "reject_recommended"]
+
+
+class EvidenceItem(BaseModel):
+    """One link in a flag's evidence chain: a source, and the exact text taken from it.
+
+    A flag with one EvidenceItem is a settled fact from a single lookup. A flag with
+    two or more is a comparison — which is exactly the shape a contradiction takes:
+    two quotes, two sources, disagreeing.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    source: Source
+    quote: str = Field(
+        description="The exact text this claim rests on, taken from that source. "
+        "Not a paraphrase — if it cannot be quoted, it does not belong here."
+    )
+
+
 class ModelFlag(BaseModel):
     """A flag as the LLM is allowed to express it.
 
@@ -72,6 +92,13 @@ class ModelFlag(BaseModel):
     happens to enforce the right design: `origin` is pipeline metadata recording
     who authored the flag, and letting the model set it would let it claim its own
     judgments were deterministic lookups.
+
+    The fields below `source` exist so a flag is never just a conclusion — every one
+    carries the claim it examines, the evidence for and against it, and what
+    specifically remains unknown. "The AI never produces an unsupported conclusion"
+    is enforced by the schema, not by instruction: `sources` cannot be empty, and
+    `evidence` is kept as the single human-readable line the UI shows by default,
+    with `sources` as the expandable chain behind it.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -83,6 +110,42 @@ class ModelFlag(BaseModel):
         "referencing the source material. Never a bare restatement of the flag type."
     )
     source: Source
+
+    claim: str = Field(
+        description="The specific assertion under examination, stated plainly — e.g. "
+        "'The organizer operates 12 schools.' Not the flag type restated."
+    )
+    sources: list[EvidenceItem] = Field(
+        min_length=1,
+        description="Every piece of evidence this finding rests on. One item for a "
+        "simple fact from a single source. Two or more when comparing claims across "
+        "sources — required whenever contradiction is true.",
+    )
+    reasoning: str = Field(
+        description="How the sources above support or conflict with the claim. "
+        "One or two sentences connecting the quotes to the conclusion."
+    )
+    finding_confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="Confidence in THIS finding specifically, not the campaign overall.",
+    )
+    uncertainty: str = Field(
+        description="What remains unverified or unknown about this specific claim, "
+        "stated plainly. Never empty — if nothing is uncertain, say what would make "
+        "you more confident anyway."
+    )
+    contradiction: bool = Field(
+        description="True only when two or more sources make claims that cannot both "
+        "be true. False for an unverified or merely absent claim — absence is not "
+        "a contradiction."
+    )
+    next_action: NextAction = Field(
+        description="none: informational only. verify_manually: a human should check "
+        "this directly. request_more_information: the organizer should be asked to "
+        "clarify or document this specific claim. reject_recommended: this finding "
+        "alone is serious enough to warrant rejection."
+    )
 
 
 class Flag(ModelFlag):
@@ -182,6 +245,45 @@ class DecisionLogEntry(BaseModel):
     reviewer_note: str = ""
     decided_by: str = ""
     decided_at: str
+
+
+class ClarificationDraft(BaseModel):
+    """What the LLM produces when asked to draft a request for more information.
+
+    Deliberately small and separate from SynthesisDraft: this is a different task
+    (writing to a person, not assessing a campaign) with a different failure mode —
+    a bad draft costs a reviewer a rewrite, not a wrong risk decision.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    subject: str
+    body: str = Field(
+        description="A polite, specific message naming exactly what could not be "
+        "verified and what documentation would resolve it. Written in the same "
+        "language as the campaign text."
+    )
+
+
+class ClarificationRequest(BaseModel):
+    """A clarification request as stored and returned by the API.
+
+    Never sent for real — see ASSUMPTIONS.md. What is real is the audit trail: who
+    drafted it, whether it was edited, who sent it, and when. That trail is the
+    actual deliverable, not the (mocked) delivery.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: int
+    campaign_id: str
+    claim: str
+    subject: str
+    body: str
+    status: Literal["draft", "sent", "dismissed"]
+    drafted_at: str
+    sent_at: str | None = None
+    sent_by: str | None = None
 
 
 RiskReport.model_rebuild()

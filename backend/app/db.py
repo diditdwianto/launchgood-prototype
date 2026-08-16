@@ -394,3 +394,93 @@ def _assisted_split() -> dict:
         "unassisted_labels": by.get(False, 0),
         "unknown_labels": by.get(None, 0),
     }
+
+
+# ------------------------------------------------------------- clarification requests
+
+
+def create_clarification_draft(campaign_id: str, claim: str, subject: str, body: str) -> dict:
+    with connect() as conn:
+        row = conn.execute(
+            "INSERT INTO clarification_requests (campaign_id, claim, subject, body)"
+            " VALUES (%s, %s, %s, %s)"
+            " RETURNING id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by",
+            (campaign_id, claim, subject, body),
+        ).fetchone()
+    return _clarification_dict(row)
+
+
+def update_clarification_draft(request_id: int, subject: str, body: str) -> dict | None:
+    """Reviewer edits before sending. Only drafts can be edited — a sent message is
+    a record of what actually went out, not a text field to keep revising."""
+    with connect() as conn:
+        row = conn.execute(
+            "UPDATE clarification_requests SET subject = %s, body = %s"
+            " WHERE id = %s AND status = 'draft'"
+            " RETURNING id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by",
+            (subject, body, request_id),
+        ).fetchone()
+    return _clarification_dict(row) if row else None
+
+
+def send_clarification(request_id: int, sent_by: str) -> dict | None:
+    """Marks a draft as sent. No email is dispatched — this is the audited human
+    action, not the delivery."""
+    with connect() as conn:
+        row = conn.execute(
+            "UPDATE clarification_requests SET status = 'sent', sent_at = now(),"
+            " sent_by = %s WHERE id = %s AND status = 'draft'"
+            " RETURNING id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by",
+            (sent_by, request_id),
+        ).fetchone()
+    return _clarification_dict(row) if row else None
+
+
+def dismiss_clarification(request_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "UPDATE clarification_requests SET status = 'dismissed'"
+            " WHERE id = %s AND status = 'draft'"
+            " RETURNING id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by",
+            (request_id,),
+        ).fetchone()
+    return _clarification_dict(row) if row else None
+
+
+def get_clarification(request_id: int) -> dict | None:
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by FROM clarification_requests WHERE id = %s",
+            (request_id,),
+        ).fetchone()
+    return _clarification_dict(row) if row else None
+
+
+def list_clarifications(campaign_id: str) -> list[dict]:
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT id, campaign_id, claim, subject, body, status, drafted_at,"
+            " sent_at, sent_by FROM clarification_requests"
+            " WHERE campaign_id = %s ORDER BY drafted_at DESC",
+            (campaign_id,),
+        ).fetchall()
+    return [_clarification_dict(r) for r in rows]
+
+
+def _clarification_dict(row) -> dict:
+    return {
+        "id": row["id"],
+        "campaign_id": row["campaign_id"],
+        "claim": row["claim"],
+        "subject": row["subject"],
+        "body": row["body"],
+        "status": row["status"],
+        "drafted_at": _iso(row["drafted_at"]),
+        "sent_at": _iso(row["sent_at"]) if row["sent_at"] else None,
+        "sent_by": row["sent_by"],
+    }

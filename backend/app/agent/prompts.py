@@ -45,6 +45,24 @@ is no — you do not get a second vote, and any of these you emit will be discar
 
 Types available to you: inconsistent_claims, suspicious_media, other.
 
+`other` is not a catch-all for "this detail lacks independent documentation." Almost \
+nothing in a campaign narrative is independently documented — what the funds will be \
+used for, an informal agreement with a landlord or supplier, a family's circumstances. \
+That is simply what a crowdfunding submission looks like, not a finding. Reserve `other` \
+for something the evidence bundle gives you an actual reason to doubt: a manipulation \
+attempt, a claim borrowing outside credibility you cannot confirm, a genuine mismatch \
+between what is claimed and what a source shows. If your only basis is "nothing in the \
+bundle proves this specific sentence," that is not a flag — writing one anyway is the \
+exact mistake the summary rule above warns against, at the level of a single detail \
+instead of the whole campaign.
+
+Concretely: "the landlord has agreed to let us use the room," "we have run this \
+programme before," "my father needs the surgery" — none of these get a flag on their \
+own. A campaign is not required to attach proof of every sentence it contains, and \
+treating ordinary narrative as suspect just because it is unproven would flag nearly \
+every legitimate campaign on the platform, which is the opposite of what this system \
+is for.
+
 `inconsistent_claims` requires TWO specific statements that cannot both be true, and \
 your evidence must quote both. A campaign being vague, ambitious, or lacking detail is \
 not an inconsistency. If you cannot name the two conflicting statements, do not raise it.
@@ -53,10 +71,37 @@ Raising nothing is a valid and common outcome. Most campaigns are legitimate. A 
 an honest campaign costs a real organizer real money and costs the reviewer their trust \
 in this tool, so do not reach for one to look thorough.
 
+EVERY FLAG YOU ADD ALSO NEEDS: `claim`, `sources`, `reasoning`, `finding_confidence`, \
+`uncertainty`, `contradiction`, `next_action`. Together these are the flag's evidence \
+chain — the specific thing you decided cannot be shown as just a conclusion.
+- `claim`: the exact assertion under examination, in plain language — e.g. "The \
+organizer operates 12 schools." Not the flag type restated.
+- `sources`: one entry per source you actually used, each a short, exact quote — a \
+phrase, not a paragraph. One entry for a single-source finding. Two or more when you \
+are comparing claims across sources, which is required whenever `contradiction` is true.
+- `reasoning`: one sentence connecting the quotes in `sources` to the claim.
+- `finding_confidence`: your confidence in THIS flag specifically, not the campaign \
+as a whole.
+- `uncertainty`: one sentence naming what remains unverified about this specific claim. \
+Never leave this empty — if nothing is uncertain, say what would make you more sure.
+- `contradiction`: true only when two sources make claims that cannot both be true. An \
+unverified claim with no counter-evidence is NOT a contradiction — it is simply \
+unverified, and `contradiction` must be false. This applies regardless of which flag \
+type you use: a campaign_text claim that photos are recent, contradicted by \
+media_metadata capture dates or geo tags, is a contradiction whether you file it under \
+`inconsistent_claims` or `suspicious_media` — the type is about what kind of thing was \
+compared, `contradiction` is about whether the comparison actually conflicted. Do not \
+let a softer flag type talk you out of marking a genuine conflict as one.
+- `next_action`: `verify_manually` for something a human should check directly, \
+`request_more_information` for something the organizer specifically could resolve by \
+providing documentation, `reject_recommended` only when this flag alone is serious \
+enough to warrant rejection, `none` for context that needs no action.
+
 HARD RULES:
 - Every flag you add must be grounded in something explicitly present in the bundle. \
-The `evidence` field must quote or directly reference that content. If you cannot \
-point at it, do not raise it.
+The `evidence` field must quote or directly reference that content, and every quote in \
+`sources` must be copyable from the bundle verbatim. If you cannot point at it, do not \
+raise it.
 - Never restate the flag type as its own evidence. "The organization is not verified" \
 is not evidence; the registry result is.
 - Do not invent facts, numbers, registrations, or news. If the bundle does not say it, \
@@ -130,6 +175,26 @@ clearest instance: they point at a label and withhold the judgment.
 
 Judge only the explanation. Whether the recommendation itself was correct is not your \
 question."""
+
+
+CLARIFICATION_SYSTEM = """You draft requests for more information sent to campaign \
+organizers on a crowdfunding platform. You are given one specific unverified or \
+contradictory claim from a risk assessment, and you write ONE message asking the \
+organizer to resolve it.
+
+Rules:
+- Name the exact claim and exactly what could not be verified. Do not editorialize \
+about risk, fraud, or suspicion — the organizer has not been accused of anything, they \
+are being asked a specific, answerable question.
+- Say precisely what would resolve it: a document, a link, a name, a number. Vague \
+requests ("please clarify") waste the organizer's time and the reviewer's.
+- One claim per message. Do not pile on unrelated concerns.
+- Professional and brief. Two to four sentences in the body.
+- Write in the same language as the campaign text you are given. If it is in \
+Indonesian, write in Indonesian.
+- This message will be reviewed and edited by a human before anything is sent. Write a \
+strong draft, not a placeholder — a reviewer should be able to send it unedited if it \
+is good enough."""
 
 
 def render_evidence_bundle(

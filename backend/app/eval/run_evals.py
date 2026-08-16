@@ -12,13 +12,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from dotenv import load_dotenv
+from pydantic import BaseModel, ConfigDict, Field
 
 load_dotenv()
 load_dotenv(dotenv_path="../.env")
@@ -27,7 +27,7 @@ from ..agent import tools  # noqa: E402
 from ..agent.graph import assess  # noqa: E402
 from ..agent.prompts import JUDGE_SYSTEM, SUMMARY_JUDGE_SYSTEM  # noqa: E402
 from ..agent.schemas import RiskReport, Severity  # noqa: E402
-from ..agent.synthesis_llm import model_name  # noqa: E402
+from ..agent.synthesis_llm import _call_structured, model_name  # noqa: E402
 
 CASES = Path(__file__).resolve().parent / "eval_cases.json"
 SEED = Path(__file__).resolve().parent.parent / "data" / "seed_assessments.json"
@@ -99,7 +99,15 @@ def check_case(report: RiskReport, checks: dict) -> list[str]:
 
 
 def structural_checks(report: RiskReport) -> list[str]:
-    """Invariants that must hold for every report regardless of case."""
+    """Invariants that must hold for every report regardless of case.
+
+    The evidence-chain fields (claim, sources, reasoning, uncertainty, contradiction)
+    are schema-required but not schema-enforced to be meaningful — nothing stops a
+    model from satisfying `required` with an empty string, or setting
+    `contradiction=True` while citing only one source. "The AI never produces an
+    unsupported conclusion" is a claim this suite should actually verify, not just
+    a field that exists.
+    """
     failures = []
     if not 0 <= report.risk_score <= 100:
         failures.append(f"risk_score {report.risk_score} out of bounds")
@@ -109,38 +117,46 @@ def structural_checks(report: RiskReport) -> list[str]:
         # An evidence string that merely restates the label cites nothing.
         if f.evidence.strip().lower().rstrip(".") == f.type.value.replace("_", " "):
             failures.append(f"{f.type.value} evidence merely restates the flag type")
+
+        if not f.claim.strip():
+            failures.append(f"{f.type.value} has an empty claim")
+        if not f.reasoning.strip():
+            failures.append(f"{f.type.value} has empty reasoning")
+        if not f.uncertainty.strip():
+            failures.append(f"{f.type.value} has empty uncertainty")
+        if not f.sources:
+            failures.append(f"{f.type.value} cites zero sources — an unsupported conclusion")
+        if f.contradiction and len(f.sources) < 2:
+            failures.append(
+                f"{f.type.value} claims a contradiction from only {len(f.sources)} source(s)"
+            )
+        for s in f.sources:
+            if not s.quote.strip():
+                failures.append(f"{f.type.value} has an empty quote for source {s.source.value}")
     return failures
 
 
 # --------------------------------------------------------------- layer 2: judge
 
-JUDGE_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "verdicts": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "flag_type": {"type": "string"},
-                    "verdict": {
-                        "type": "string",
-                        "enum": ["supported", "overstated", "unsupported"],
-                    },
-                    "quoted_span": {
-                        "type": "string",
-                        "description": "Exact text from the bundle relied on. Empty if none exists.",
-                    },
-                    "reason": {"type": "string"},
-                },
-                "required": ["flag_type", "verdict", "quoted_span", "reason"],
-            },
-        }
-    },
-    "required": ["verdicts"],
-}
+class JudgeVerdict(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    flag_type: str
+    verdict: Literal["supported", "overstated", "unsupported"]
+    quoted_span: str = Field(
+        description="Exact text from the bundle relied on. Empty if none exists."
+    )
+    reason: str
+
+
+class JudgeVerdicts(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verdicts: list[JudgeVerdict]
+
+
+class SummaryAudit(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    verdict: Literal["explains", "names_only", "absent"]
+    reason: str
 
 
 def judge(report: RiskReport, bundle: str) -> list[dict]:
@@ -149,49 +165,41 @@ def judge(report: RiskReport, bundle: str) -> list[dict]:
     This is the layer deterministic checks structurally cannot replace: schema
     validity and enum membership say nothing about whether a plausible-sounding
     number actually appears in the source. That is an entailment question.
+
+    Routed through the same `_call_structured` chain-fallback the live assessment
+    pipeline uses (`llm_synthesize`, `draft_clarification`) rather than a raw,
+    unwrapped Groq client. A raw client here meant the judge had no fallback at all:
+    it hung retrying a model whose daily quota was already exhausted from the same
+    day's testing, since that exhaustion state lives in `_exhausted` in the live
+    server process and a fresh `run_evals` invocation never sees it — only the real
+    429 tells it, which only the shared chain checks for.
     """
     if not report.flags:
         return []
-
-    from groq import Groq
 
     flags_text = "\n".join(
         f"- type={f.type.value} severity={f.severity.value} source={f.source.value}\n"
         f"  evidence: {f.evidence}"
         for f in report.flags
     )
-    client = Groq(api_key=os.environ["groq_api_key"])
-    resp = client.chat.completions.create(
-        model=model_name(),
-        messages=[
-            {"role": "system", "content": JUDGE_SYSTEM},
-            {
-                "role": "user",
-                "content": (
-                    f"=== EVIDENCE BUNDLE ===\n{bundle}\n=== END BUNDLE ===\n\n"
-                    f"=== FLAGS TO AUDIT ===\n{flags_text}\n\n"
-                    "Return one verdict per flag, in order."
-                ),
-            },
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "judge", "strict": True, "schema": JUDGE_SCHEMA},
+    messages = [
+        {"role": "system", "content": JUDGE_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"=== EVIDENCE BUNDLE ===\n{bundle}\n=== END BUNDLE ===\n\n"
+                f"=== FLAGS TO AUDIT ===\n{flags_text}\n\n"
+                "Return one verdict per flag, in order."
+            ),
         },
-        temperature=0.0,
+    ]
+    result = _call_structured(
+        messages,
+        JudgeVerdicts,
+        "judge",
+        "Do not change any verdict; fix only the structure.",
     )
-    return json.loads(resp.choices[0].message.content)["verdicts"]
-
-
-SUMMARY_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "verdict": {"type": "string", "enum": ["explains", "names_only", "absent"]},
-        "reason": {"type": "string"},
-    },
-    "required": ["verdict", "reason"],
-}
+    return [v.model_dump() for v in result.verdicts]
 
 
 def judge_summary(report: RiskReport) -> dict:
@@ -201,28 +209,23 @@ def judge_summary(report: RiskReport) -> dict:
     real explanation share most of their vocabulary. The distinction is semantic,
     which is what the judge layer is for.
     """
-    from groq import Groq
-
     flags_text = "\n".join(
         f"- {f.type.value} (severity {f.severity.value}): {f.evidence}" for f in report.flags
     )
-    client = Groq(api_key=os.environ["groq_api_key"])
-    resp = client.chat.completions.create(
-        model=model_name(),
-        messages=[
-            {"role": "system", "content": SUMMARY_JUDGE_SYSTEM},
-            {
-                "role": "user",
-                "content": f"=== FLAGS ===\n{flags_text}\n\n=== SUMMARY ===\n{report.reasoning_summary}",
-            },
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "summary_audit", "strict": True, "schema": SUMMARY_SCHEMA},
+    messages = [
+        {"role": "system", "content": SUMMARY_JUDGE_SYSTEM},
+        {
+            "role": "user",
+            "content": f"=== FLAGS ===\n{flags_text}\n\n=== SUMMARY ===\n{report.reasoning_summary}",
         },
-        temperature=0.0,
+    ]
+    result = _call_structured(
+        messages,
+        SummaryAudit,
+        "summary_audit",
+        "Do not change the verdict; fix only the structure.",
     )
-    return json.loads(resp.choices[0].message.content)
+    return result.model_dump()
 
 
 CALIBRATION_BUNDLE = """CAMPAIGN CMP-9999
@@ -267,33 +270,28 @@ def run_calibration() -> tuple[int, int, list[str]]:
     A judge that rubber-stamps is worse than no judge, because it manufactures
     confidence. This proves it can fail something before its passes are trusted.
     """
-    from groq import Groq
-
     flags_text = "\n".join(
         f"- type={f['type']} severity={f['severity']} source={f['source']}\n  evidence: {f['evidence']}"
         for f in CALIBRATION_FLAGS
     )
-    client = Groq(api_key=os.environ["groq_api_key"])
-    resp = client.chat.completions.create(
-        model=model_name(),
-        messages=[
-            {"role": "system", "content": JUDGE_SYSTEM},
-            {
-                "role": "user",
-                "content": (
-                    f"=== EVIDENCE BUNDLE ===\n{CALIBRATION_BUNDLE}\n=== END BUNDLE ===\n\n"
-                    f"=== FLAGS TO AUDIT ===\n{flags_text}\n\n"
-                    "Return one verdict per flag, in order."
-                ),
-            },
-        ],
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "judge", "strict": True, "schema": JUDGE_SCHEMA},
+    messages = [
+        {"role": "system", "content": JUDGE_SYSTEM},
+        {
+            "role": "user",
+            "content": (
+                f"=== EVIDENCE BUNDLE ===\n{CALIBRATION_BUNDLE}\n=== END BUNDLE ===\n\n"
+                f"=== FLAGS TO AUDIT ===\n{flags_text}\n\n"
+                "Return one verdict per flag, in order."
+            ),
         },
-        temperature=0.0,
+    ]
+    result = _call_structured(
+        messages,
+        JudgeVerdicts,
+        "judge",
+        "Do not change any verdict; fix only the structure.",
     )
-    verdicts = json.loads(resp.choices[0].message.content)["verdicts"]
+    verdicts = [v.model_dump() for v in result.verdicts]
     caught = [v for v in verdicts if v["verdict"] != "supported"]
     notes = [f"{v['flag_type']}: {v['verdict']}" for v in verdicts]
     return len(caught), len(CALIBRATION_FLAGS), notes

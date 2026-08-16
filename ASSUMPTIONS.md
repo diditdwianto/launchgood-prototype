@@ -51,9 +51,21 @@ parts of the design would change.
   and escalate exist only as human actions recorded in the decision log. Fund release,
   campaign publishing and any donor-facing action are out of scope entirely — the system
   stops at a recommendation plus a logged human decision.
-- **No authentication.** A single unguarded reviewer route. There is one reviewer role,
-  and "escalate" records the intent to send to a second reviewer without implementing a
-  second queue.
+- **Single-reviewer authentication.** Real password auth (scrypt + signed bearer
+  tokens, no third-party identity provider), but one flat reviewer role and no
+  self-registration — accounts are created out of band. Escalating a campaign keeps
+  it in the same queue rather than routing it to a distinct second-reviewer role;
+  the review page says this plainly when a campaign is escalated, since nothing
+  currently stops the same person deciding it twice.
+- **Clarification requests to organizers are never actually sent.** "Request more
+  information" drafts a message with the model and lets a reviewer edit it, but
+  clicking Send only marks it sent in the database — no email leaves the server.
+  What is real is the audit trail: who drafted it, whether it was edited, who
+  clicked send and when. Wiring an actual outbound channel (SMTP, a transactional
+  email API) is a credential the prototype does not have, and the interesting
+  design problem here was never "can this call an email API" — it was making sure
+  an AI-drafted message to a real person cannot go out without an explicit,
+  attributed human action, which is what is actually built and tested.
 - **Postgres, for persistence rather than scale.** The original brief said not to build
   a real database layer; that constraint was lifted deliberately, because the decision
   log is the one artefact here a human authored and it doubles as the eval data. On a

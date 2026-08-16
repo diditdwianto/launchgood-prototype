@@ -22,6 +22,7 @@ from .schemas import (
     AssessmentFailed,
     AssessmentOk,
     AssessmentResult,
+    EvidenceItem,
     Flag,
     FlagType,
     NodeTrace,
@@ -106,6 +107,22 @@ def org_lookup(state: AssessmentState) -> dict:
                     evidence=result.detail,
                     source=Source.org_registry,
                     origin="deterministic",
+                    claim="The organizer is a registered, verifiable organization.",
+                    sources=[EvidenceItem(source=Source.org_registry, quote=result.detail)],
+                    reasoning=(
+                        f"The registry check returned {result.status}, which is a "
+                        f"direct finding from a lookup, not an inference."
+                    ),
+                    finding_confidence=1.0,
+                    uncertainty=(
+                        "Absence from the registries actually queried does not rule out "
+                        "registration elsewhere; only what was checked is reported here."
+                        if result.status == "absent"
+                        else "This record reflects one registry snapshot; current status "
+                        "beyond it is not independently confirmed."
+                    ),
+                    contradiction=False,
+                    next_action="reject_recommended" if severity is Severity.high else "verify_manually",
                 )
             )
         return {"org": result, "pre_flags": flags}, f"Registry status: {result.status}."
@@ -140,17 +157,31 @@ def duplicate_check(state: AssessmentState) -> dict:
                     f"{worst.status}"
                 )
 
+            evidence_text = (
+                f"{len(worst.shared_fingerprints)} image fingerprints shared with "
+                f'{worst.campaign_id} "{worst.title}", {context}. '
+                f"Body text similarity {worst.text_similarity}."
+            )
             flags.append(
                 Flag(
                     type=FlagType.duplicate_content,
                     severity=severity,
-                    evidence=(
-                        f"{len(worst.shared_fingerprints)} image fingerprints shared with "
-                        f'{worst.campaign_id} "{worst.title}", {context}. '
-                        f"Body text similarity {worst.text_similarity}."
-                    ),
+                    evidence=evidence_text,
                     source=Source.duplicate_check,
                     origin="deterministic",
+                    claim="This campaign's images and description are original to it.",
+                    sources=[EvidenceItem(source=Source.duplicate_check, quote=evidence_text)],
+                    reasoning=(
+                        f"Fingerprint and text comparison against past campaigns found a "
+                        f"match, {context}."
+                    ),
+                    finding_confidence=1.0 if worst.shared_fingerprints else worst.text_similarity,
+                    uncertainty=(
+                        "Image matching uses pre-seeded fingerprints standing in for a "
+                        "perceptual hash, not real image analysis."
+                    ),
+                    contradiction=False,
+                    next_action="reject_recommended" if severity is Severity.high else "none",
                 )
             )
 
@@ -181,17 +212,35 @@ def ask_and_media(state: AssessmentState) -> dict:
                 if ask.multiple >= tools.HIGH_ASK_HIGH_MULTIPLE
                 else Severity.medium
             )
+            evidence_text = (
+                f"USD {ask.goal_usd:,} is {ask.multiple}x the USD "
+                f"{ask.median_first_time_ask:,.0f} median first-time-organizer ask, "
+                f"from an organizer with no completed campaigns on the platform."
+            )
             flags.append(
                 Flag(
                     type=FlagType.high_ask_no_track_record,
                     severity=severity,
-                    evidence=(
-                        f"USD {ask.goal_usd:,} is {ask.multiple}x the USD "
-                        f"{ask.median_first_time_ask:,.0f} median first-time-organizer ask, "
-                        f"from an organizer with no completed campaigns on the platform."
-                    ),
+                    evidence=evidence_text,
                     source=Source.platform_stats,
                     origin="deterministic",
+                    claim="This ask is proportionate to the organizer's track record.",
+                    sources=[EvidenceItem(source=Source.platform_stats, quote=evidence_text)],
+                    reasoning=(
+                        f"{ask.multiple}x the typical first-time ask, with zero completed "
+                        f"campaigns on record, is disproportionate to what this organizer "
+                        f"has demonstrably delivered on this platform so far."
+                    ),
+                    finding_confidence=1.0,
+                    uncertainty=(
+                        "A high ask alone does not distinguish fraud from an unusually "
+                        "large legitimate need — verify against the specific costs claimed."
+                    ),
+                    contradiction=False,
+                    # Never reject_recommended on its own: the canonical ambiguous case
+                    # this flag exists for is exactly "6x median because of fraud, or
+                    # because of a hospital bill" — that judgment needs a human.
+                    next_action="verify_manually",
                 )
             )
 

@@ -3,6 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import ClarificationPanel from "@/components/ClarificationPanel";
 import FlagCard from "@/components/FlagCard";
 import { QUEUE_CHANGED } from "@/components/QueueRail";
 import { Empty, SectionLabel, TierBadge } from "@/components/ui";
@@ -14,6 +15,7 @@ import {
   usd,
   type CampaignDetail,
   type Decision,
+  type Flag,
 } from "@/lib/api";
 
 const SCORE_COLOR = { low: "text-low", medium: "text-medium", high: "text-high" };
@@ -27,6 +29,8 @@ export default function ReviewPage() {
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [showBundle, setShowBundle] = useState(false);
+  const [clarifyOpen, setClarifyOpen] = useState(false);
+  const [clarifyFlag, setClarifyFlag] = useState<Flag | null>(null);
 
   const load = useCallback(() => {
     getCampaign(id)
@@ -55,6 +59,11 @@ export default function ReviewPage() {
     } finally {
       setBusy(null);
     }
+  }
+
+  function requestInfo(flag: Flag) {
+    setClarifyFlag(flag);
+    setClarifyOpen(true);
   }
 
   async function reassess() {
@@ -217,10 +226,21 @@ export default function ReviewPage() {
           </section>
           ) : null}
 
-          <SectionLabel>
-            Evidence trail · {assessment.report.flags.length}{" "}
-            {assessment.report.flags.length === 1 ? "flag" : "flags"}
-          </SectionLabel>
+          <div className="mb-3 flex items-baseline justify-between">
+            <SectionLabel>
+              Evidence trail · {assessment.report.flags.length}{" "}
+              {assessment.report.flags.length === 1 ? "flag" : "flags"}
+            </SectionLabel>
+            <button
+              onClick={() => {
+                setClarifyFlag(null);
+                setClarifyOpen(true);
+              }}
+              className="text-brand-deep mb-3 text-[12.5px] underline underline-offset-4"
+            >
+              Request more information
+            </button>
+          </div>
 
           {assessment.report.flags.length === 0 ? (
             <p className="bg-panel border-line text-muted mb-6 rounded-lg border px-4 py-3.5 text-sm">
@@ -229,8 +249,21 @@ export default function ReviewPage() {
                 : "No flags raised by the automated checks."}
             </p>
           ) : (
-            assessment.report.flags.map((f, i) => <FlagCard key={i} flag={f} />)
+            assessment.report.flags.map((f, i) => (
+              <FlagCard key={i} flag={f} onRequestInfo={requestInfo} />
+            ))
           )}
+
+          {clarifyOpen ? (
+            <ClarificationPanel
+              campaignId={id}
+              pendingFlag={clarifyFlag}
+              onClose={() => {
+                setClarifyOpen(false);
+                setClarifyFlag(null);
+              }}
+            />
+          ) : null}
         </>
       )}
 

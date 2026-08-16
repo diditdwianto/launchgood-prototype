@@ -416,6 +416,79 @@ def telemetry(request: Request, probe: bool = False) -> dict:
     return data
 
 
+class ClarificationDraftRequest(BaseModel):
+    claim: str = Field(min_length=4, max_length=500)
+    evidence_summary: str = Field(min_length=4, max_length=2000)
+
+
+@app.post("/api/campaigns/{campaign_id}/clarification")
+def draft_clarification_request(
+    campaign_id: str, body: ClarificationDraftRequest, username: str = Depends(auth.current_user)
+) -> dict:
+    """AI drafts a request for more information about one specific claim. Nothing is
+    sent — this only creates a draft a reviewer can edit or discard.
+
+    Real model call, real cost, so it is authenticated and scoped to one claim at a
+    time rather than offered as a bulk action.
+    """
+    campaign = find_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="campaign not found")
+
+    from .agent.synthesis_llm import draft_clarification
+
+    draft = draft_clarification(campaign, body.claim, body.evidence_summary)
+    record = db.create_clarification_draft(campaign_id, body.claim, draft.subject, draft.body)
+    return {"clarification": record}
+
+
+@app.get("/api/campaigns/{campaign_id}/clarification")
+def list_clarification_requests(campaign_id: str) -> dict:
+    return {"clarifications": db.list_clarifications(campaign_id)}
+
+
+class ClarificationEdit(BaseModel):
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=4000)
+
+
+@app.patch("/api/clarification/{request_id}")
+def edit_clarification_request(request_id: int, body: ClarificationEdit) -> dict:
+    record = db.update_clarification_draft(request_id, body.subject, body.body)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail="draft not found, or it has already been sent"
+        )
+    return {"clarification": record}
+
+
+@app.post("/api/clarification/{request_id}/send")
+def send_clarification_request(request_id: int, username: str = Depends(auth.current_user)) -> dict:
+    """The human-in-the-loop action itself: a reviewer explicitly approves this exact
+    text going to the organizer.
+
+    No email is sent — see ASSUMPTIONS.md. What is real is that this write only
+    happens on an explicit, authenticated click, and it is permanent: `sent_by` and
+    `sent_at` are what make this an audit trail rather than a text field.
+    """
+    record = db.send_clarification(request_id, username)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail="draft not found, or it has already been sent"
+        )
+    return {"clarification": record}
+
+
+@app.post("/api/clarification/{request_id}/dismiss")
+def dismiss_clarification_request(request_id: int) -> dict:
+    record = db.dismiss_clarification(request_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail="draft not found, or it has already been sent"
+        )
+    return {"clarification": record}
+
+
 @app.get("/api/decisions")
 def decision_log() -> dict:
     entries = db.decisions()

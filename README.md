@@ -52,6 +52,61 @@ raise it. A lookup is not a matter of opinion.
 
 What is left for the model is the part no rules engine can do — and it is the harder part.
 
+## Every flag is a claim, not a verdict
+
+A risk score alone answers "how worried should I be" but not "why" — and "why" is what a
+reviewer actually needs before overriding an AI recommendation on a live campaign. So
+every flag, deterministic or model-authored, carries its full reasoning rather than a
+one-line label:
+
+```
+claim              the specific assertion under examination
+sources[]           every source consulted, each an exact quote — never a paraphrase
+reasoning           how the sources support or conflict with the claim
+finding_confidence  confidence in THIS finding, distinct from the report-level confidence
+uncertainty         what remains unverified, stated plainly — never empty
+contradiction       true only when two sources make claims that cannot both be true
+next_action         none · verify_manually · request_more_information · reject_recommended
+```
+
+A flag with one source is a settled fact rendered the same way a contradiction is — the
+schema makes both look like a chain, because neither is allowed to be just a conclusion.
+`sources` cannot be empty (`min_length=1`), and the eval suite's structural checks go
+further than the schema does: `contradiction=True` with fewer than two sources fails the
+suite, as does a blank `claim`, `reasoning`, or `uncertainty` — a required field that is
+allowed to be empty is not actually required.
+
+The console shows this as an expandable "evidence chain" under each flag — click it and
+the claim, every source, and (when two sources disagree) a contradiction banner render as
+a small graph, closer to how the reviewer would reconstruct the reasoning by hand than to
+a risk-score readout.
+
+**This did not come free.** Asking for seven structured fields per flag instead of two
+roughly doubled completion size, which pushed testing straight into Groq's per-minute
+token cap mid-session — see the rate-limit fallback fix below, found and fixed by hitting
+it directly. It also measurably increased how often the model manufactured a minor `other`
+flag about an ordinary, unprovable narrative detail — a landlord's verbal permission, "we
+have run this before" — treating "nothing in the bundle proves this exact sentence" as a
+finding, which is the opposite of the platform's own stated philosophy that absence of
+evidence is not evidence. Measured before any fix: 2/3 runs on one campaign, 1/3 on two
+others. The prompt now names the pattern by example rather than only stating the rule in
+the abstract, and after that the clean-case false-positive rate returned to 0/4.
+
+## Request more information — a human-approved message, not an automated one
+
+Some findings resolve by asking the organiser directly. When a flag's `next_action` is
+`request_more_information`, the console offers to draft a message: the model writes a
+specific, single-claim request naming exactly what could not be verified and what would
+resolve it, in the campaign's own language. A reviewer reads it, can edit every word, and
+nothing happens until they click **Send**.
+
+No email is actually dispatched — that integration is out of scope for a prototype, see
+[ASSUMPTIONS.md](ASSUMPTIONS.md). What is real is the audit trail: `clarification_requests`
+records who drafted it, whether it was edited before sending, who clicked Send, and when.
+That log, not the delivery, is the actual answer to the human-in-the-loop question — an
+AI-drafted action that touches someone outside the system does not fire without an
+explicit, attributed human approval.
+
 ## Failure modes, and what happens in each
 
 | Failure | Behaviour |
@@ -62,7 +117,10 @@ What is left for the model is the part no rules engine can do — and it is the 
 | Synthesis fails entirely | A typed error envelope, rendered as "needs manual triage." The campaign sorts *above* scored ones — a submission nobody could assess needs a human sooner than one scored low. |
 | Groq rate-limits | Retried honouring `retry-after`. Distinguished from a malformed request, which is never retried, and from an exhausted daily quota, which advances the model chain. |
 | The model cites a source the schema forbids | Fixed at the root: the bundle's section headers and the `Source` enum are one contract, and a test fails if they drift. A schema rejection is also fed back into the conversation rather than blind-retried. |
+| A model exhausts its retries — daily quota, per-minute limit, or repeated malformed output | The chain now falls through to the next model for any of these, not only a daily quota. Found directly: a per-minute 429 on `gpt-oss-20b` used to fail the whole assessment instead of trying `gpt-oss-120b`, which had headroom. Only a genuine daily-quota exhaustion is remembered for the rest of the process; a per-minute limit is retried fresh on the next campaign. |
+| Groq's real 429 wait time isn't where the code expected it | Found by inspecting a live 429: Groq never sends the standard `Retry-After` header, only `x-ratelimit-reset-tokens` in its own `1m26.4s`-style format. Every retry before this fix was guessing with blind exponential backoff instead of reading the number the server actually sent. |
 | The campaign text tries to instruct the model | Treated as untrusted input, ignored, and recorded as a high-severity flag. Test case `CMP-4481`. |
+| "Draft a request" fired the model twice per click | React StrictMode double-invokes effects in development to catch missing cleanup — and a draft call triggered from a `useEffect` on prop change is exactly the kind of unguarded side effect it exists to catch. Confirmed directly: two draft rows with an identical `drafted_at` timestamp to the second, from one click. A `useRef` guard makes the effect idempotent per open; a real click is not re-invoked by StrictMode, so the guard costs nothing on a genuine second request. |
 
 **Search proves existence, never identity.** Found by submitting a live campaign named
 after BAZNAS, Indonesia's national zakat agency. Search returned abundant evidence that
@@ -95,20 +153,29 @@ uv run python -m app.eval.run_evals --live       # re-run the pipeline first
 Current state:
 
 ```
-DETERMINISTIC   13/14 cases pass          (14/14 on gpt-oss-120b)
+DETERMINISTIC   12/14 cases pass
   clean               4/4  (0 false positives)
-  ambiguous           2/3
-LLM-AS-JUDGE    16/16 flags judged supported (100%)
-SUMMARY AUDIT   3/3 ambiguous-case summaries explain their flags rather than naming them
-CALIBRATION     2/2 planted fabrications caught
+  ambiguous           1/3
 ```
 
 **These numbers are model-dependent, and that is the point of having them.** The suite
-scored 14/14 on `gpt-oss-120b` and 13/14 after dropping to `gpt-oss-20b`. The remaining
-failure is `CMP-4476`, and it is a measured capability gap rather than a guess: running
-that one campaign through both models, 20b raises no model-authored flag while 120b
-raises the unverifiable-affiliation concern at medium severity. Same prompt, same
-evidence. Swapping models without an eval suite would have made that silent.
+has scored anywhere from 12/14 to 14/14 depending on which model in the chain answered
+and which sample it drew — every committed seed is one sample, not an ensemble. The two
+cases that actually flicker are both instructive rather than random:
+
+- `CMP-4476` (the affiliation-borrowing case) needs the model to *add* a flag the
+  deterministic layer cannot produce on its own. Measured directly: three consecutive
+  calls to the exact same model on the exact same evidence produced clean, flagged,
+  flagged. This was first described here as a clean capability gap between `gpt-oss-20b`
+  and `gpt-oss-120b` — that framing did not survive more testing. It is noisy across
+  every model in the chain, including the ones assumed reliable. The honest fix is not a
+  bigger model, it is treating this specific finding as inherently uncertain and saying
+  so, which is exactly what `finding_confidence` on the flag itself is for.
+- `CMP-4474` (the flagship ambiguous case) occasionally reports 0.75–0.85 confidence
+  against an instruction that says stay under 0.7. Same shape of variance, different rule.
+
+Swapping models, or even just re-running the same one, without an eval suite would have
+made both of these invisible instead of documented.
 
 Two regressions the swap exposed were fixed properly rather than absorbed:
 
