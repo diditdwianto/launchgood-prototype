@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trust Copilot Deploy Runbook</title>
+<style>
+  :root {
+    --ground: #f5f5f5;
+    --panel: #ffffff;
+    --panel-2: #fafafa;
+    --ink: #171717;
+    --muted: #5c5c5c;
+    --faint: #8a8a8a;
+    --line: #e5e7eb;
+    --line-soft: #eef0f1;
+
+    --brand: #4aa567;
+    --brand-deep: #3c8653;
+    --brand-tint: #e9f4ed;
+
+    --warn: #9a7b1b;
+    --warn-tint: #f6efdc;
+    --warn-line: #e6d6a1;
+
+    --critical: #b32d3c;
+    --critical-tint: #fae8ea;
+    --critical-line: #eab8bf;
+
+    --code-bg: #14181c;
+    --code-ink: #e7ecef;
+    --code-muted: #8b98a3;
+    --code-key: #7fd4a0;
+
+    --shadow: 0 1px 2px rgba(23, 23, 23, 0.05), 0 4px 16px rgba(23, 23, 23, 0.04);
+    --radius: 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131615;
+      --panel: #191d1c;
+      --panel-2: #1e2322;
+      --ink: #edf1ef;
+      --muted: #a7b0ad;
+      --faint: #74807c;
+      --line: #2b3231;
+      --line-soft: #232928;
+
+      --brand: #5fc082;
+      --brand-deep: #7fd4a0;
+      --brand-tint: rgba(95, 192, 130, 0.13);
+
+      --warn: #d9ae4e;
+      --warn-tint: rgba(217, 174, 78, 0.12);
+      --warn-line: rgba(217, 174, 78, 0.3);
+
+      --critical: #e28792;
+      --critical-tint: rgba(226, 135, 146, 0.12);
+      --critical-line: rgba(226, 135, 146, 0.32);
+
+      --code-bg: #0d0f0e;
+      --code-ink: #dce4e1;
+      --code-muted: #7c8a85;
+      --code-key: #7fd4a0;
+
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #131615;
+    --panel: #191d1c;
+    --panel-2: #1e2322;
+    --ink: #edf1ef;
+    --muted: #a7b0ad;
+    --faint: #74807c;
+    --line: #2b3231;
+    --line-soft: #232928;
+
+    --brand: #5fc082;
+    --brand-deep: #7fd4a0;
+    --brand-tint: rgba(95, 192, 130, 0.13);
+
+    --warn: #d9ae4e;
+    --warn-tint: rgba(217, 174, 78, 0.12);
+    --warn-line: rgba(217, 174, 78, 0.3);
+
+    --critical: #e28792;
+    --critical-tint: rgba(226, 135, 146, 0.12);
+    --critical-line: rgba(226, 135, 146, 0.32);
+
+    --code-bg: #0d0f0e;
+    --code-ink: #dce4e1;
+    --code-muted: #7c8a85;
+    --code-key: #7fd4a0;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+
+  a { color: var(--brand-deep); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  code {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 0.1em 0.4em;
+  }
+
+  h1, h2, h3 { text-wrap: balance; font-weight: 700; letter-spacing: -0.01em; }
+
+  /* ---------------------------------------------------------- shell ---- */
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 28px 96px;
+  }
+
+  header.top {
+    padding: 40px 0 22px;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--brand-deep);
+  }
+  .eyebrow .dot {
+    width: 7px; height: 7px; border-radius: 2px;
+    background: var(--brand);
+    display: inline-block;
+  }
+
+  h1.title {
+    margin: 10px 0 8px;
+    font-size: 30px;
+  }
+
+  .lede {
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  .order-note {
+    margin-top: 14px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  .order-note b { color: var(--ink); }
+
+  .gate {
+    margin-top: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    background: var(--critical-tint);
+    border: 1px solid var(--critical-line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    max-width: 62ch;
+  }
+  .gate .mark {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--critical);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+    margin-top: 1px;
+  }
+  .gate p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ink); }
+  .gate p b { color: var(--critical); }
+
+  /* ---------------------------------------------------------- layout --- */
+
+  .layout {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 40px;
+    margin-top: 36px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    nav.rail { display: none; }
+  }
+
+  nav.rail {
+    position: sticky;
+    top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  nav.rail a {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13px;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  nav.rail a .n {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 11px;
+    color: var(--faint);
+    flex-shrink: 0;
+    width: 1.4em;
+  }
+  nav.rail a:hover { background: var(--panel-2); color: var(--ink); }
+  nav.rail a.active {
+    background: var(--brand-tint);
+    color: var(--brand-deep);
+    font-weight: 600;
+  }
+  nav.rail a.active .n { color: var(--brand-deep); }
+
+  main { min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+
+  section.card {
+    scroll-margin-top: 24px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 26px 28px 28px;
+    box-shadow: var(--shadow);
+  }
+
+  .card-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .card-head .num {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 13px;
+    color: var(--brand-deep);
+    background: var(--brand-tint);
+    border-radius: 6px;
+    padding: 2px 7px;
+    font-weight: 700;
+  }
+  h2.card-title { margin: 0; font-size: 19px; }
+  .card-sub { margin: 10px 0 18px; color: var(--muted); font-size: 13.5px; max-width: 68ch; }
+
+  h3.sub-title { font-size: 14.5px; margin: 22px 0 10px; color: var(--ink); }
+
+  ol.steps { margin: 0; padding-left: 0; list-style: none; counter-reset: step; }
+  ol.steps > li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 30px;
+    margin-bottom: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  ol.steps > li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0.15em;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+  ol.steps > li:last-child { margin-bottom: 0; }
+
+  p.body-text { font-size: 14px; line-height: 1.7; color: var(--ink); max-width: 70ch; }
+  p.body-text.muted, .prose-muted { color: var(--muted); }
+
+  /* -------------------------------------------------------------- table */
+
+  .table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--line); border-radius: 9px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 420px; }
+  th {
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--faint);
+    background: var(--panel-2);
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    font-weight: 700;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.key, td:first-child { font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace; font-size: 12.5px; color: var(--brand-deep); white-space: nowrap; }
+
+  /* --------------------------------------------------------------- code */
+
+  .code-block {
+    position: relative;
+    margin: 14px 0;
+    background: var(--code-bg);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .code-block pre {
+    margin: 0;
+    padding: 14px 52px 14px 16px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--code-ink);
+  }
+  .code-block .prompt { color: var(--code-key); user-select: none; }
+  .copy-btn {
+    position: absolute;
+    top: 9px; right: 9px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--code-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    border-radius: 6px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .copy-btn:hover { color: var(--code-ink); border-color: rgba(255,255,255,0.28); }
+  .copy-btn.copied { color: var(--code-key); border-color: var(--code-key); }
+
+  /* ----------------------------------------------------------- callout */
+
+  .callout {
+    display: flex;
+    gap: 12px;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 16px 0;
+    font-size: 13.5px;
+    line-height: 1.6;
+  }
+  .callout p { margin: 0 0 6px; }
+  .callout p:last-child { margin-bottom: 0; }
+  .callout.warn { background: var(--warn-tint); border: 1px solid var(--warn-line); }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.brand { background: var(--brand-tint); border: 1px solid var(--brand-tint); }
+  .callout.brand .tag { color: var(--brand-deep); }
+  .callout .tag {
+    flex-shrink: 0;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    padding-top: 2px;
+  }
+
+  /* --------------------------------------------------------- checklist */
+
+  ul.checklist { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  ul.checklist li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13.5px;
+  }
+  ul.checklist li:hover { background: var(--panel-2); }
+  ul.checklist input[type="checkbox"] {
+    appearance: none;
+    width: 17px; height: 17px;
+    border: 1.5px solid var(--line);
+    border-radius: 5px;
+    background: var(--panel);
+    margin: 1.5px 0 0;
+    flex-shrink: 0;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: background-color 0.12s ease, border-color 0.12s ease;
+  }
+  ul.checklist input[type="checkbox"]::before {
+    content: "";
+    width: 9px; height: 9px;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 45% 62%);
+    transform: scale(0);
+    transition: transform 0.12s ease;
+    background: white;
+  }
+  ul.checklist input[type="checkbox"]:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  ul.checklist input[type="checkbox"]:checked::before { transform: scale(1); }
+  ul.checklist label { cursor: pointer; }
+  ul.checklist li.checked label { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--line); }
+
+  /* ---------------------------------------------------------- env grid */
+
+  .env-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin: 16px 0;
+  }
+  @media (max-width: 620px) { .env-grid { grid-template-columns: 1fr; } }
+  .env-file {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--panel-2);
+  }
+  .env-file .from {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .env-file .arrow { color: var(--faint); margin: 0 6px; }
+  .env-file .to {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+    font-size: 12.5px;
+    color: var(--brand-deep);
+    font-weight: 600;
+  }
+  .env-file .scope { margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+
+  /* ------------------------------------------------------------ footer */
+
+  .closing {
+    margin-top: 8px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .closing .note b { color: var(--ink); }
+  .closing .note { font-size: 13.5px; color: var(--muted); line-height: 1.65; max-width: 72ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.001ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <header class="top">
+    <span class="eyebrow"><span class="dot"></span>Campaign Trust Copilot</span>
+    <h1 class="title">Deploy runbook</h1>
+    <p class="lede">Both URLs must be live and reachable without login — the posting treats a missing deploy or a missing video as an automatic rejection, so this is a hard gate, not a finishing touch.</p>
+    <p class="order-note">Order matters: <b>backend first</b>, because the frontend needs its URL at build time.</p>
+
+    <div class="gate">
+      <span class="mark">!</span>
+      <p><b>Hard gate.</b> A submission missing either the deployed demo or the under-5-minute video is rejected outright — this isn't a nice-to-have step in the checklist below, it's the whole reason this document exists.</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="rail" id="rail">
+      <a href="#s0"><span class="n">0</span>Environment</a>
+      <a href="#s1"><span class="n">1</span>Backend → Render</a>
+      <a href="#s2"><span class="n">2</span>Frontend → Vercel</a>
+      <a href="#s3"><span class="n">3</span>CORS</a>
+      <a href="#s4"><span class="n">4</span>Before recording</a>
+      <a href="#s5"><span class="n">5</span>End-to-end check</a>
+      <a href="#s6"><span class="n">6</span>Submission</a>
+      <a href="#notes"><span class="n">·</span>Notes</a>
+    </nav>
+
+    <main>
+
+      <section class="card" id="s0">
+        <div class="card-head"><span class="num">0</span><h2 class="card-title">Environment variables</h2></div>
+        <p class="card-sub">Two example files document every variable this app reads — copy each one and fill in real values rather than reconstructing the list from scratch.</p>
+
+        <div class="env-grid">
+          <div class="env-file">
+            <div><span class="from">.env.example</span><span class="arrow">→</span><span class="to">.env</span></div>
+            <div class="scope">repo root · backend: model provider keys, database, auth, CORS</div>
+          </div>
+          <div class="env-file">
+            <div><span class="from">frontend/.env.example</span><span class="arrow">→</span><span class="to">frontend/.env.local</span></div>
+            <div class="scope">frontend: where the backend lives</div>
+          </div>
+        </div>
+
+        <p class="body-text muted">Both copies are gitignored; the <code>.example</code> files are not, so they stay the source of truth for what a fresh checkout needs.</p>
+
+        <div class="callout brand">
+          <span class="tag">Host / IP</span>
+          <div>
+            <p><code>NEXT_PUBLIC_API_BASE</code> in <code>frontend/.env.example</code> is the backend's host, as far as the frontend is concerned. It already reads from the environment in <code>frontend/lib/api.ts</code> — nothing to change there — but the value itself isn't tied to Render. It works identically whether the backend is a Render service URL, a custom domain, or a bare VPS IP like <code>http://203.0.113.10:8000</code>: whatever you put here is what the deployed frontend calls.</p>
+            <p>The walkthrough below uses Render because it's free and needs zero code changes for this project's shape — but nothing past this point assumes it.</p>
+          </div>
+        </div>
+
+        <p class="body-text muted">Locally, both files' hardcoded fallbacks (<code>http://localhost:8000</code> for the frontend, <code>docker-compose.yml</code>'s Postgres for the backend) mean the app runs with <b style="color:var(--ink)">no <code>.env</code> file at all</b> — the copies only start mattering once you need a real model key or a non-localhost backend.</p>
+      </section>
+
+      <section class="card" id="s1">
+        <div class="card-head"><span class="num">1</span><h2 class="card-title">Backend → Render</h2></div>
+
+        <ol class="steps">
+          <li>Push to GitHub, then at <a href="https://dashboard.render.com" target="_blank" rel="noopener">dashboard.render.com</a> create a <b>New Web Service</b> from the repo.</li>
+          <li>
+            Settings:
+            <div class="table-wrap">
+              <table>
+                <tr><th>Field</th><th>Value</th></tr>
+                <tr><td>Root directory</td><td class="mono">backend</td></tr>
+                <tr><td>Runtime</td><td>Python 3</td></tr>
+                <tr><td>Build command</td><td class="mono">pip install uv &amp;&amp; uv sync --frozen</td></tr>
+                <tr><td>Start command</td><td class="mono">uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT</td></tr>
+                <tr><td>Instance type</td><td>Free is sufficient — but read §4</td></tr>
+              </table>
+            </div>
+          </li>
+          <li>
+            Environment variables — the full list, with what each does, lives in <code>.env.example</code> at the repo root; this is the subset that actually matters for a first deploy:
+            <div class="table-wrap">
+              <table>
+                <tr><th>Key</th><th>Value</th></tr>
+                <tr><td>groq_api_key</td><td>your key</td></tr>
+                <tr><td>model_chain</td><td class="mono" style="font-size:11.5px;">openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b</td></tr>
+                <tr><td>nvidia_build_api_key</td><td><i>optional</i> — enables the NVIDIA tail of the chain</td></tr>
+                <tr><td>cors_origins</td><td>set <b>after</b> step 2, to the exact Vercel origin</td></tr>
+                <tr><td>database_url</td><td><b>required</b> — the Postgres URL; see §1a below</td></tr>
+                <tr><td>PYTHON_VERSION</td><td>3.13.3</td></tr>
+              </table>
+            </div>
+            <p class="body-text muted">The model value is a fallback chain, fast first and durable last, spanning Groq and NVIDIA. Each Groq model has its own daily token quota; when one runs out the next takes over mid-run. The NVIDIA model at the end is limited per minute rather than per day, so it does not run out — it's the reason a spent quota degrades the demo to slow instead of breaking it. Only models verified to support strict <code>json_schema</code> are accepted; the app refuses to start otherwise.</p>
+            <p class="body-text muted">Do not set <code>tavily_api_key</code> — leaving it unset keeps the demo deterministic.</p>
+          </li>
+          <li>
+            Verify:
+            <div class="code-block">
+              <button class="copy-btn" data-copy="curl https://&lt;your-service&gt;.onrender.com/api/health">Copy</button>
+              <pre><span class="prompt">$</span> curl https://&lt;your-service&gt;.onrender.com/api/health</pre>
+            </div>
+            <p class="body-text muted">should return <code>{"ok":true, ..., "assessed":14}</code>. The <code>assessed:14</code> field is the check that matters — it confirms the seed loaded and the reviewer won't open an empty queue.</p>
+          </li>
+        </ol>
+
+        <h3 class="sub-title">1a. Postgres</h3>
+        <p class="body-text">Render → <b>New → PostgreSQL</b> (the free instance is ample), then copy its <b>Internal</b> Database URL into the web service as <code>database_url</code>. Tables are created on first boot by the migration runner — there's no manual setup step.</p>
+        <p class="body-text muted">The decision log lives here and survives redeploys. Assessments still re-seed on every start, so only human decisions persist — which is the intent.</p>
+      </section>
+
+      <section class="card" id="s2">
+        <div class="card-head"><span class="num">2</span><h2 class="card-title">Frontend → Vercel</h2></div>
+        <ol class="steps">
+          <li>At <a href="https://vercel.com/new" target="_blank" rel="noopener">vercel.com/new</a>, import the same repo.</li>
+          <li>Set <b>Root Directory</b> to <code>frontend</code>. Framework preset (Next.js) is detected.</li>
+          <li>
+            Environment variable — see <code>frontend/.env.example</code> for the full explanation:
+            <div class="table-wrap">
+              <table>
+                <tr><th>Key</th><th>Value</th></tr>
+                <tr><td>NEXT_PUBLIC_API_BASE</td><td class="mono">https://&lt;your-service&gt;.onrender.com</td></tr>
+              </table>
+            </div>
+            <p class="body-text muted">No trailing slash. This is the backend's host — swap in a custom domain or a bare VPS IP here instead and nothing else in this step changes. It's inlined at build time, so <b style="color:var(--ink)">changing it later requires a redeploy</b>, not just a restart.</p>
+          </li>
+          <li>Deploy, then copy the production URL.</li>
+        </ol>
+      </section>
+
+      <section class="card" id="s3">
+        <div class="card-head"><span class="num">3</span><h2 class="card-title">Close the CORS loop</h2></div>
+        <p class="body-text">Set <code>cors_origins</code> on Render to the exact Vercel origin (e.g. <code>https://campaign-trust-copilot.vercel.app</code>, no trailing slash) and let it restart.</p>
+        <p class="body-text muted">Leaving it at the <code>*</code> default will work, but setting it properly is the correct posture and costs nothing.</p>
+      </section>
+
+      <section class="card" id="s4">
+        <div class="card-head"><span class="num">4</span><h2 class="card-title">Before recording — read this one</h2></div>
+        <p class="body-text">Render's free tier <b>sleeps after 15 minutes idle</b>, and the first request afterwards takes 30–60 seconds. On camera that's a dead pause with nothing to narrate.</p>
+
+        <p class="body-text" style="margin-top:16px;">Either:</p>
+        <ol class="steps">
+          <li>Load the deployed frontend a minute or two before you hit record, and keep the tab open; or</li>
+          <li>Put the service on Render's cheapest paid instance for the week you're submitting.</li>
+        </ol>
+
+        <div class="callout warn">
+          <span class="tag">Reviewer risk</span>
+          <p>If a reviewer opens your link cold, they'll hit the same delay. If that concerns you, the paid instance is worth it for the submission window — or ping <code>/api/health</code> from an external scheduler (e.g. cron-job.org) every 10 minutes to keep the free instance warm continuously. It's unauthenticated and cheap: a Postgres row count, no model calls.</p>
+        </div>
+      </section>
+
+      <section class="card" id="s5">
+        <div class="card-head"><span class="num">5</span><h2 class="card-title">End-to-end check on the deployed URLs</h2></div>
+        <p class="card-sub" style="margin-bottom:6px;">Do this against the live URLs, not localhost.</p>
+        <ul class="checklist" id="checklist">
+          <li><input type="checkbox" id="c1"><label for="c1">Queue loads with 14 campaigns, sorted by risk score descending</label></li>
+          <li><input type="checkbox" id="c2"><label for="c2"><code>CMP-4471</code> detail: three flags, each showing evidence, source, and a rule/model tag</label></li>
+          <li><input type="checkbox" id="c3"><label for="c3">"Show the exact evidence bundle" expands</label></li>
+          <li><input type="checkbox" id="c4"><label for="c4">"Re-run assessment" completes and updates the report — this is the live model call</label></li>
+          <li><input type="checkbox" id="c5"><label for="c5">Approve / Reject / Escalate each log a decision and remove the campaign from the queue</label></li>
+          <li><input type="checkbox" id="c6"><label for="c6">Decision log shows the outcome as agreed / overrode / deferred</label></li>
+          <li><input type="checkbox" id="c7"><label for="c7"><code>CMP-4474</code> shows <code>manual_review</code> at low confidence with <b>no</b> flags</label></li>
+        </ul>
+      </section>
+
+      <section class="card" id="s6">
+        <div class="card-head"><span class="num">6</span><h2 class="card-title">Submission</h2></div>
+        <ul class="checklist">
+          <li><input type="checkbox" id="d1"><label for="d1">Frontend URL — the one to lead with</label></li>
+          <li><input type="checkbox" id="d2"><label for="d2">Backend URL — link <code>/api/health</code> or <code>/docs</code> rather than the bare root</label></li>
+          <li><input type="checkbox" id="d3"><label for="d3">Video link, under 5 minutes</label></li>
+        </ul>
+      </section>
+
+      <div class="closing" id="notes">
+        <div class="note"><b>Decisions survive redeploys; assessments do not.</b> Assessments are a cache rebuilt from the committed seed on every boot. That's deliberate — but it means the queue resets to 14 pending on each deploy, while anything you decided stays in the log.</div>
+        <div class="note"><b>Rebuilding the seed is a local operation.</b> Run <code>uv run python -m app.build_seed</code>, commit the updated <code>backend/app/data/seed_assessments.json</code>, and push. Never set <code>reassess_on_start=1</code> in production — it makes cold start depend on fourteen model calls landing inside the free tier's rate limit, which is the exact failure this design avoids.</div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var text = btn.getAttribute('data-copy');
+      navigator.clipboard.writeText(text).then(function () {
+        var original = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('copied');
+        }, 1400);
+      });
+    });
+  });
+
+  document.querySelectorAll('.checklist li').forEach(function (li) {
+    var box = li.querySelector('input[type="checkbox"]');
+    if (!box) return;
+    box.addEventListener('change', function () {
+      li.classList.toggle('checked', box.checked);
+    });
+  });
+
+  var sections = Array.prototype.slice.call(document.querySelectorAll('main .card, .closing'));
+  var links = Array.prototype.slice.call(document.querySelectorAll('nav.rail a'));
+  if ('IntersectionObserver' in window && sections.length && links.length) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        var link = links.find(function (a) { return a.getAttribute('href') === '#' + entry.target.id; });
+        if (!link) return;
+        if (entry.isIntersecting) {
+          links.forEach(function (a) { a.classList.remove('active'); });
+          link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-15% 0px -70% 0px' });
+    sections.forEach(function (s) { observer.observe(s); });
+  }
+</script>
+</body>
+</html>

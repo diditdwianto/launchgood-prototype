@@ -8,6 +8,36 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
 
 ---
 
+## 0. Environment variables
+
+Two example files document every variable this app reads — copy each one and fill in
+real values rather than inventing the list from scratch:
+
+| File | Copy to | Scope |
+|---|---|---|
+| `.env.example` (repo root) | `.env` | Backend: model provider keys, database, auth, CORS |
+| `frontend/.env.example` | `frontend/.env.local` | Frontend: where the backend lives |
+
+Both copies are gitignored; the `.example` files are not, so they stay the source of
+truth for what a fresh checkout needs.
+
+**The one that matters for this section's heading:** `NEXT_PUBLIC_API_BASE` in
+`frontend/.env.example` is the backend's host, as far as the frontend is concerned. It
+already reads from the environment in `frontend/lib/api.ts` — nothing to change there —
+but the value itself is not tied to Render. It works identically whether the backend is
+a Render service URL, a custom domain, or a bare VPS IP (`http://203.0.113.10:8000`):
+whatever you put here is what the deployed frontend calls. The walkthrough below uses
+Render because it's free and needs zero code changes for this project's shape (see the
+"Vercel-only" question this doc's companion conversation already answered), but nothing
+past this point assumes it.
+
+Locally, both files' hardcoded fallbacks (`http://localhost:8000` for the frontend,
+`docker-compose.yml`'s Postgres for the backend) mean the app runs with **no `.env` file
+at all** — the copies only start mattering once you need a real model key or a
+non-localhost backend.
+
+---
+
 ## 1. Backend → Render
 
 1. Push to GitHub, then at [dashboard.render.com](https://dashboard.render.com) create a
@@ -22,13 +52,17 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
    | Start command | `uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
    | Instance type | Free is sufficient — but read §4 |
 
-3. Environment variables:
+3. Environment variables (the full list, with what each does, lives in `.env.example`
+   at the repo root — this is the subset that actually matters for a first deploy):
 
    | Key | Value |
    |---|---|
    | `groq_api_key` | your key |
    | `model_chain` | `openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b` |
    | `nvidia_build_api_key` | *optional* — enables the NVIDIA tail of the chain |
+   | `cors_origins` | set **after** step 2, to the exact Vercel origin |
+   | `database_url` | **required** — the Postgres URL; see step 1a |
+   | `PYTHON_VERSION` | `3.13.3` |
 
    The model value is a fallback chain, fast first and durable last, spanning Groq and
    NVIDIA. Each Groq model has its own daily token quota; when one runs out the next
@@ -36,9 +70,6 @@ Order matters: **backend first**, because the frontend needs its URL at build ti
    day, so it does not run out — it is the reason a spent quota degrades the demo to
    slow instead of breaking it. Only models verified to support strict `json_schema` are
    accepted; the app refuses to start otherwise.
-   | `cors_origins` | set **after** step 2, to the exact Vercel origin |
-   | `database_url` | **required** — the Postgres URL; see step 1a |
-   | `PYTHON_VERSION` | `3.13.3` |
 
    Do not set `tavily_api_key` — leaving it unset keeps the demo deterministic.
 
@@ -61,14 +92,15 @@ start, so only human decisions persist — which is the intent.
 
 1. At [vercel.com/new](https://vercel.com/new), import the same repo.
 2. Set **Root Directory** to `frontend`. Framework preset (Next.js) is detected.
-3. Environment variable:
+3. Environment variable (see `frontend/.env.example` for the full explanation):
 
    | Key | Value |
    |---|---|
    | `NEXT_PUBLIC_API_BASE` | `https://<your-service>.onrender.com` |
 
-   No trailing slash. This is inlined at build time, so **changing it later requires a
-   redeploy**, not just a restart.
+   No trailing slash. This is the backend's host — swap in a custom domain or a bare
+   VPS IP here instead and nothing else in this step changes. It's inlined at build
+   time, so **changing it later requires a redeploy**, not just a restart.
 
 4. Deploy, then copy the production URL.
 
