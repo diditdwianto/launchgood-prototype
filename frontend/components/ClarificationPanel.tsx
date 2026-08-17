@@ -172,14 +172,14 @@ export default function ClarificationPanel({
               onClick={send}
               disabled={busy === editing.id}
               title="Simulated — no email is actually sent. Marks this request as sent, by you, with a timestamp."
-              className="bg-brand hover:bg-brand-deep rounded-lg px-4 py-2 text-[12.5px] font-semibold text-white transition-colors disabled:opacity-40"
+              className="bg-brand hover:bg-brand-deep rounded-full px-4 py-2 text-[12.5px] font-semibold text-white transition-colors disabled:opacity-40"
             >
               {busy === editing.id ? "Sending…" : "Send (simulated)"}
             </button>
             <button
               onClick={discard}
               disabled={busy === editing.id}
-              className="border-line hover:bg-ground rounded-lg border px-4 py-2 text-[12.5px] font-semibold transition-colors disabled:opacity-40"
+              className="border-line hover:bg-ground rounded-full border px-4 py-2 text-[12.5px] font-semibold transition-colors disabled:opacity-40"
             >
               Discard
             </button>

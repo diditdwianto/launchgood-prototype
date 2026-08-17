@@ -229,7 +229,7 @@ export default function SubmitPage() {
         <button
           type="submit"
           disabled={running}
-          className="bg-brand hover:bg-brand-deep rounded-lg px-5 py-2.5 text-[13.5px] font-semibold text-white transition-colors disabled:opacity-40"
+          className="bg-brand hover:bg-brand-deep rounded-full px-5 py-2.5 text-[13.5px] font-semibold text-white transition-colors disabled:opacity-40"
         >
           {running ? "Assessing…" : "Run assessment"}
         </button>

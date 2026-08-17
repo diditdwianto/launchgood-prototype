@@ -351,21 +351,21 @@ export default function ReviewPage() {
             <button
               disabled={!!busy || assessment.status !== "ok"}
               onClick={() => decide("approve")}
-              className="bg-brand hover:bg-brand-deep rounded-lg px-4.5 py-2.5 text-[13.5px] font-semibold text-white transition-colors disabled:opacity-40"
+              className="bg-brand hover:bg-brand-deep rounded-full px-4.5 py-2.5 text-[13.5px] font-semibold text-white transition-colors disabled:opacity-40"
             >
               Approve
             </button>
             <button
               disabled={!!busy || assessment.status !== "ok"}
               onClick={() => decide("reject")}
-              className="bg-high rounded-lg px-4.5 py-2.5 text-[13.5px] font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40"
+              className="bg-high rounded-full px-4.5 py-2.5 text-[13.5px] font-semibold text-white transition-colors hover:brightness-110 disabled:opacity-40"
             >
               Reject
             </button>
             <button
               disabled={!!busy || assessment.status !== "ok"}
               onClick={() => decide("escalate")}
-              className="border-line hover:bg-panel rounded-lg border px-4.5 py-2.5 text-[13.5px] font-semibold transition-colors disabled:opacity-40"
+              className="border-line hover:bg-panel rounded-full border px-4.5 py-2.5 text-[13.5px] font-semibold transition-colors disabled:opacity-40"
             >
               {data.escalated ? "Escalate again" : "Escalate"}
             </button>

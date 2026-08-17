@@ -58,7 +58,7 @@ export default function FlagCard({
       {open && flag.next_action === "request_more_information" && onRequestInfo ? (
         <button
           onClick={() => onRequestInfo(flag)}
-          className="bg-brand hover:bg-brand-deep mt-3 w-full rounded-lg py-2 text-[12.5px] font-semibold text-white transition-colors"
+          className="bg-brand hover:bg-brand-deep mt-3 w-full rounded-full py-2 text-[12.5px] font-semibold text-white transition-colors"
         >
           Draft a request for more information
         </button>

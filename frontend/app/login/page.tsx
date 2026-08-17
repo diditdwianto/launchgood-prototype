@@ -76,7 +76,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={busy || !username || !password}
-          className="bg-brand hover:bg-brand-deep w-full rounded-lg py-2.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
+          className="bg-brand hover:bg-brand-deep w-full rounded-full py-2.5 text-[14px] font-semibold text-white transition-colors disabled:opacity-40"
         >
           {busy ? "Signing in…" : "Sign in"}
         </button>

@@ -121,7 +121,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
           ) : isLogin ? null : (
             <Link
               href="/login"
-              className="bg-brand hover:bg-brand-deep rounded-lg px-3.5 py-1.5 font-semibold text-white transition-colors"
+              className="bg-brand hover:bg-brand-deep rounded-full px-3.5 py-1.5 font-semibold text-white transition-colors"
             >
               Sign in
             </Link>

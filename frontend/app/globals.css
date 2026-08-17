@@ -1,25 +1,27 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ground: #eef1f3;
+  --color-ground: #f5f5f5;
   --color-panel: #ffffff;
-  --color-ink: #121a19;
-  --color-muted: #66707a;
-  --color-line: #dde3e5;
+  --color-ink: #171717;
+  --color-muted: #525252;
+  --color-line: #e5e7eb;
 
-  --color-brand: #2f7a66;
-  --color-brand-deep: #245e4e;
-  --color-brand-tint: #e3efeb;
+  /* LaunchGood's own brand green (launchgood.com `bg-primary`), with its
+     actual hover/active shades — not a guess. */
+  --color-brand: #4aa567;
+  --color-brand-deep: #3c8653;
+  --color-brand-tint: #e9f4ed;
 
-  --color-low: #2f7a66;
-  --color-low-tint: #e3efeb;
+  --color-low: #4aa567;
+  --color-low-tint: #e9f4ed;
   --color-medium: #9a7b1b;
   --color-medium-tint: #f6efdc;
   --color-high: #b32d3c;
   --color-high-tint: #fae8ea;
 
-  --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-plus-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 html,
