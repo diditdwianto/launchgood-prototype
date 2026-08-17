@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import AppIntroModal from "@/components/AppIntroModal";
 import QueueRail from "@/components/QueueRail";
 import { clearToken, getToken } from "@/lib/api";
 
@@ -11,6 +12,10 @@ import { clearToken, getToken } from "@/lib/api";
 // inspected without being handed the keys to it — someone evaluating the design
 // should not need an account to see how it works.
 const PUBLIC_ROUTES = ["/login", "/under-the-hood"];
+
+// Shown once per browser tab right after signing in, so it survives reloads
+// within the session but doesn't nag on every page.
+const INTRO_SEEN_KEY = "tc_intro_seen";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,6 +25,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
 
   const [ready, setReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -32,6 +38,10 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     if (token && isLogin) {
       router.replace("/");
       return;
+    }
+    if (token && !sessionStorage.getItem(INTRO_SEEN_KEY)) {
+      sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+      setShowIntro(true);
     }
     setReady(true);
   }, [isPublic, isLogin, pathname, router]);
@@ -82,6 +92,20 @@ export default function Shell({ children }: { children: React.ReactNode }) {
               <Link href="/decisions" className="hover:text-ink transition-colors">
                 Decision log
               </Link>
+              <Link
+                href="/about"
+                className={`transition-colors ${
+                  pathname === "/about" ? "text-brand-deep font-medium" : "hover:text-ink"
+                }`}
+              >
+                About me
+              </Link>
+              <button
+                onClick={() => setShowIntro(true)}
+                className="hover:text-ink cursor-pointer transition-colors"
+              >
+                Intro
+              </button>
               <button
                 onClick={signOut}
                 className="hover:text-ink cursor-pointer transition-colors"
@@ -113,6 +137,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       ) : (
         <main className="h-[calc(100vh-57px)] overflow-y-auto">{children}</main>
       )}
+
+      {showIntro ? <AppIntroModal onClose={() => setShowIntro(false)} /> : null}
     </>
   );
 }
