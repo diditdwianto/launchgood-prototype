@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { login } from "@/lib/api";
+import { INTRO_PENDING_KEY } from "@/components/Shell";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await login(username, password);
+      sessionStorage.setItem(INTRO_PENDING_KEY, "1");
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));

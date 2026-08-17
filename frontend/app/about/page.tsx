@@ -72,7 +72,7 @@ export default function AboutPage() {
       <SectionLabel>Who I am</SectionLabel>
       <p className="text-muted mb-8 max-w-[660px] text-[13.5px] leading-relaxed">
         I&apos;m a revert (mualaf) to Islam — I took my shahada in 2012, fourteen
-        years ago — and I live in Greater Jakarta, Indonesia. By day I lead
+        years ago — and I live in Jakarta, Indonesia. By day I lead
         product and engineering organizations; the largest was around 150 people
         running 66 initiatives across the subsidiaries of a state-owned pharma
         holding. My focus these days is AI-first engineering: RAG, agentic
@@ -81,7 +81,7 @@ export default function AboutPage() {
 
       <SectionLabel>Why this project</SectionLabel>
       <p className="text-muted mb-8 max-w-[660px] text-[13.5px] leading-relaxed">
-        I&apos;m a regular user of Kitabisa and similar donation-based
+        I&apos;m a regular user of Kitabisa.com and similar donation-based
         crowdfunding platforms here in Indonesia — giving sedekah and zakat
         through them is routine. And it comes with a routine problem: it is
         genuinely hard, as a donor, to tell a legitimate campaign from a
@@ -91,6 +91,11 @@ export default function AboutPage() {
         than once before deciding whether to give.
         <br />
         <br />
+	There have been some issue where some campaign was found to be fraud after going live for several months and collects lots of donation. 
+	And public found out about this because some people decide to dig deeper of the campaign, the actual location, the fundraiser, 
+	and everything under the hood, that possibly missed by manual reviewer.
+	<br />
+	<br />
         That&apos;s the problem this build is aimed at — not a hypothetical
         exercise, but the same trust gap I run into as a donor on a platform not
         so different from LaunchGood. The{" "}
@@ -116,16 +121,6 @@ export default function AboutPage() {
           </div>
         ))}
       </div>
-      <p className="text-muted mb-8 max-w-[660px] text-[13.5px] leading-relaxed">
-        Most of that work has been solution architecture, product development,
-        and engineering leadership: defining application, data, integration and
-        cloud architecture, then building the teams and delivery discipline to
-        make it real. A lot of it has been in regulated environments — healthcare
-        and state-owned enterprise — where secure data handling isn&apos;t
-        optional, which is part of why I designed this build around a hard,
-        auditable line between what code decides, what a model judges, and what
-        only a human is allowed to decide.
-      </p>
 
       <SectionLabel>Selected roles</SectionLabel>
       <div className="bg-panel border-line mb-8 rounded-lg border">

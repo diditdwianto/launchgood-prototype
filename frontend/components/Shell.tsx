@@ -13,9 +13,11 @@ import { clearToken, getToken } from "@/lib/api";
 // should not need an account to see how it works.
 const PUBLIC_ROUTES = ["/login", "/under-the-hood"];
 
-// Shown once per browser tab right after signing in, so it survives reloads
-// within the session but doesn't nag on every page.
-const INTRO_SEEN_KEY = "tc_intro_seen";
+// Set by the login form right before it navigates away on success, and
+// consumed here on the very next render — a plain "have they seen it" flag
+// would stay tripped forever after the first login in a tab and silently
+// swallow every login after that.
+export const INTRO_PENDING_KEY = "tc_intro_pending";
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -39,8 +41,8 @@ export default function Shell({ children }: { children: React.ReactNode }) {
       router.replace("/");
       return;
     }
-    if (token && !sessionStorage.getItem(INTRO_SEEN_KEY)) {
-      sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+    if (token && sessionStorage.getItem(INTRO_PENDING_KEY)) {
+      sessionStorage.removeItem(INTRO_PENDING_KEY);
       setShowIntro(true);
     }
     setReady(true);
