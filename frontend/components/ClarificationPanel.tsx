@@ -141,6 +141,14 @@ export default function ClarificationPanel({
 
       {drafting ? (
         <p className="text-muted text-[13.5px]">Drafting from the model…</p>
+      ) : !editing && !pendingFlag && history.length === 0 ? (
+        <p className="text-muted mb-1 text-[13.5px] leading-relaxed">
+          Nothing drafted yet. Expand a flag below and use its{" "}
+          <span className="text-ink font-medium">
+            &ldquo;Draft a request for more information&rdquo;
+          </span>{" "}
+          button — a request needs a specific claim and evidence to draft from.
+        </p>
       ) : editing ? (
         <div className="mb-4">
           {pendingFlag ? (
