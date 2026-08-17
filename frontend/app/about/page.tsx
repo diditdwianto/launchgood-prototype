@@ -7,7 +7,7 @@ const STATS = [
   ["Product development", "since 2014"],
   ["Engineering leadership", "since 2016"],
   ["Senior leadership", "since 2019 — VP of Technology, Head of Engineering, CTO, Director"],
-  ["Scale led", "orgs up to ~150 staff, distributed teams across 4 countries"],
+  ["Org scale", "Tech orgs up to ~150 staff. Distributed teams across 4 countries"],
 ] as const;
 
 const ROLES = [
