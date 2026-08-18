@@ -161,6 +161,17 @@ export default function UnderTheHoodPage() {
       </p>
 
       <SectionLabel>The pipeline</SectionLabel>
+      <p className="text-muted mb-3 max-w-[660px] text-[13.5px] leading-relaxed">
+        Orchestrated with <span className="mono text-[12.5px]">LangGraph</span> as a
+        state machine: each step below is a node, wired linearly with no conditional
+        edges. There is no checkpointer and no interrupt/resume — the human boundary
+        is not implemented inside the graph at all. It terminates at{" "}
+        <span className="mono text-[12.5px]">human_handoff</span> by writing status{" "}
+        <span className="mono text-[12.5px]">pending_review</span>; the reviewer&apos;s
+        approve/reject/escalate click is a separate API call that happens outside the
+        graph entirely. That keeps the boundary hard — nothing downstream of the
+        handoff can execute, because there is no downstream.
+      </p>
       <ol className="bg-panel border-line mb-8 rounded-lg border">
         {PIPELINE.map((step, i) => (
           <li
