@@ -571,13 +571,14 @@
                 <tr><td>groq_api_key</td><td>your key</td></tr>
                 <tr><td>model_chain</td><td class="mono" style="font-size:11.5px;">openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b</td></tr>
                 <tr><td>nvidia_build_api_key</td><td><i>optional</i> — enables the NVIDIA tail of the chain</td></tr>
+                <tr><td>tavily_api_key</td><td><i>optional</i> — real web search for campaigns you submit live</td></tr>
                 <tr><td>cors_origins</td><td>set <b>after</b> step 2, to the exact Vercel origin</td></tr>
                 <tr><td>database_url</td><td><b>required</b> — the Postgres URL; see §1a below</td></tr>
                 <tr><td>PYTHON_VERSION</td><td>3.13.3</td></tr>
               </table>
             </div>
             <p class="body-text muted">The model value is a fallback chain, fast first and durable last, spanning Groq and NVIDIA. Each Groq model has its own daily token quota; when one runs out the next takes over mid-run. The NVIDIA model at the end is limited per minute rather than per day, so it does not run out — it's the reason a spent quota degrades the demo to slow instead of breaking it. Only models verified to support strict <code>json_schema</code> are accepted; the app refuses to start otherwise.</p>
-            <p class="body-text muted">Do not set <code>tavily_api_key</code> — leaving it unset keeps the demo deterministic.</p>
+            <p class="body-text muted">Set <code>tavily_api_key</code> if you want "Submit a campaign" → "Run assessment" to return real search results instead of "nothing found" — it only affects submitted campaigns; the 14 seeded fixtures always use canned results regardless of this key (a hard rule in code, not a config toggle — see <code>search_provider_for()</code> in <code>backend/app/agent/tools.py</code>). The trade-off: it's a real network call, so a slow or flaky moment is possible live on camera. Unset it again before recording if you'd rather that step stay fast and predictable.</p>
           </li>
           <li>
             Verify:
@@ -643,6 +644,7 @@
           <li><input type="checkbox" id="c2"><label for="c2"><code>CMP-4471</code> detail: three flags, each showing evidence, source, and a rule/model tag</label></li>
           <li><input type="checkbox" id="c3"><label for="c3">"Show the exact evidence bundle" expands</label></li>
           <li><input type="checkbox" id="c4"><label for="c4">"Re-run assessment" completes and updates the report — this is the live model call</label></li>
+          <li><input type="checkbox" id="c4b"><label for="c4b">"Request more information" on a flag drafts a real message; the header-level link (no flag selected) shows guidance rather than an empty panel</label></li>
           <li><input type="checkbox" id="c5"><label for="c5">Approve / Reject / Escalate each log a decision and remove the campaign from the queue</label></li>
           <li><input type="checkbox" id="c6"><label for="c6">Decision log shows the outcome as agreed / overrode / deferred</label></li>
           <li><input type="checkbox" id="c7"><label for="c7"><code>CMP-4474</code> shows <code>manual_review</code> at low confidence with <b>no</b> flags</label></li>

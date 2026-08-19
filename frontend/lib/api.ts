@@ -162,6 +162,24 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 const get = <T,>(path: string) => request<T>(path);
 
+/** Render's free tier spins backends down after inactivity, so a cold instance
+ *  can take tens of seconds to answer. Bound the wait rather than let fetch hang. */
+export async function checkHealth(timeoutMs = 8000): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${API_BASE}/api/health`, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function login(username: string, password: string) {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",

@@ -60,6 +60,7 @@ non-localhost backend.
    | `groq_api_key` | your key |
    | `model_chain` | `openai/gpt-oss-20b,openai/gpt-oss-120b,openai/gpt-oss-safeguard-20b,nvidia/nemotron-3-super-120b-a12b` |
    | `nvidia_build_api_key` | *optional* — enables the NVIDIA tail of the chain |
+   | `tavily_api_key` | *optional* — real web search for campaigns you submit live |
    | `cors_origins` | set **after** step 2, to the exact Vercel origin |
    | `database_url` | **required** — the Postgres URL; see step 1a |
    | `PYTHON_VERSION` | `3.13.3` |
@@ -71,7 +72,13 @@ non-localhost backend.
    slow instead of breaking it. Only models verified to support strict `json_schema` are
    accepted; the app refuses to start otherwise.
 
-   Do not set `tavily_api_key` — leaving it unset keeps the demo deterministic.
+   Set `tavily_api_key` if you want "Submit a campaign" → "Run assessment" to return
+   real search results instead of "nothing found" — it only affects submitted
+   campaigns; the 14 seeded fixtures always use canned results regardless of this key
+   (a hard rule in code, not a config toggle — see `search_provider_for()` in
+   `backend/app/agent/tools.py`). The trade-off: it's a real network call, so a slow
+   or flaky moment is possible live on camera. Unset it again before recording if you'd
+   rather that step stay fast and predictable.
 
 4. Verify: `curl https://<your-service>.onrender.com/api/health` should return
    `{"ok":true, ..., "assessed":14}`.
@@ -134,6 +141,8 @@ Do this against the live URLs, not localhost.
 - [ ] `CMP-4471` detail: three flags, each showing evidence, source, and a rule/model tag
 - [ ] "Show the exact evidence bundle" expands
 - [ ] "Re-run assessment" completes and updates the report — this is the live model call
+- [ ] "Request more information" on a flag drafts a real message; the header-level link
+      (no flag selected) shows guidance rather than an empty panel
 - [ ] Approve / Reject / Escalate each log a decision and remove the campaign from the queue
 - [ ] Decision log shows the outcome as agreed / overrode / deferred
 - [ ] `CMP-4474` shows `manual_review` at low confidence with **no** flags
